@@ -517,15 +517,19 @@ function PureMultimodalInput({
         />
         <PromptInputFooter className="px-3 pb-3">
           <PromptInputTools>
-            <AttachmentsButton
-              fileInputRef={fileInputRef}
-              selectedModelId={selectedModelId}
-              status={status}
-            />
-            <ModelSelectorCompact
-              onModelChange={onModelChange}
-              selectedModelId={selectedModelId}
-            />
+            {process.env.NEXT_PUBLIC_ENABLE_ATTACHMENTS === "true" && (
+              <AttachmentsButton
+                fileInputRef={fileInputRef}
+                selectedModelId={selectedModelId}
+                status={status}
+              />
+            )}
+            {process.env.NEXT_PUBLIC_ENABLE_MODEL_SELECTOR === "true" && (
+              <ModelSelectorCompact
+                onModelChange={onModelChange}
+                selectedModelId={selectedModelId}
+              />
+            )}
           </PromptInputTools>
 
           {status === "submitted" ? (

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import type { Chat } from "@/lib/db/schema";
 import { fetcher } from "@/lib/utils";
+import { useEventToken } from "@/hooks/use-event-token";
 import { LoaderIcon } from "./icons";
 import { ChatItem } from "./sidebar-history-item";
 
@@ -102,6 +103,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const id = pathname?.startsWith("/chat/") ? pathname.split("/")[2] : null;
+  const { ready: eventAuthReady } = useEventToken();
+  const isEventAuthMode = process.env.NEXT_PUBLIC_ENABLE_EVENT_AUTH === "true";
+  const shouldFetch = isEventAuthMode ? eventAuthReady : !!user;
 
   const {
     data: paginatedChatHistories,
@@ -110,7 +114,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isLoading,
     mutate,
   } = useSWRInfinite<ChatHistory>(
-    user ? getChatHistoryPaginationKey : () => null,
+    shouldFetch ? getChatHistoryPaginationKey : () => null,
     fetcher,
     { fallbackData: [], revalidateOnFocus: false }
   );

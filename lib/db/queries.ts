@@ -74,6 +74,26 @@ export async function createGuestUser() {
   }
 }
 
+export async function upsertPortalUser(email: string): Promise<string> {
+  try {
+    const [row] = await db
+      .insert(user)
+      .values({ email, isAnonymous: false })
+      .onConflictDoUpdate({
+        target: user.email,
+        set: { updatedAt: new Date() },
+      })
+      .returning({ id: user.id });
+
+    return row.id;
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to upsert portal user"
+    );
+  }
+}
+
 export async function saveChat({
   id,
   userId,

@@ -5,6 +5,7 @@ import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
+import { getEventAuthHeaders } from "@/lib/utils";
 import {
   MessageAction as Action,
   MessageActions as Actions,
@@ -92,6 +93,7 @@ export function PureMessageActions({
             `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/vote`,
             {
               method: "PATCH",
+              headers: { "content-type": "application/json", ...getEventAuthHeaders() },
               body: JSON.stringify({
                 chatId,
                 messageId: message.id,
@@ -145,6 +147,7 @@ export function PureMessageActions({
             `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/vote`,
             {
               method: "PATCH",
+              headers: { "content-type": "application/json", ...getEventAuthHeaders() },
               body: JSON.stringify({
                 chatId,
                 messageId: message.id,

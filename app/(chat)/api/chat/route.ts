@@ -10,16 +10,19 @@ import {
 import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
-import { auth, type UserType } from "@/app/(auth)/auth";
+import { auth } from "@/app/(auth)/auth";
+import type { UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import { resolveUser } from "@/lib/auth/resolve-user";
 import {
   allowedModelIds,
   chatModels,
   DEFAULT_CHAT_MODEL,
   getCapabilities,
 } from "@/lib/ai/models";
-import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
+import { type RequestHints, systemPrompt, eventSystemPrompt } from "@/lib/ai/prompts";
 import { getLanguageModel } from "@/lib/ai/providers";
+import { createEventTools } from "@/lib/ai/tools/event";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { editDocument } from "@/lib/ai/tools/edit-document";
 import { getWeather } from "@/lib/ai/tools/get-weather";
@@ -58,6 +61,7 @@ function getStreamContext() {
 export { getStreamContext };
 
 export async function POST(request: Request) {
+  // console.log("[api/chat/route.ts] POST request:", request);
   let requestBody: PostRequestBody;
 
   try {
@@ -67,18 +71,23 @@ export async function POST(request: Request) {
     return new ChatbotError("bad_request:api").toResponse();
   }
 
+    // console.log("[api/chat/route.ts] POST requestBody:", requestBody);
+
+
   try {
     const { id, message, messages, selectedChatModel, selectedVisibilityType } =
       requestBody;
 
-    const [, session] = await Promise.all([
+    const [, resolved] = await Promise.all([
       checkBotId().catch(() => null),
-      auth(),
+      resolveUser(request),
     ]);
 
-    if (!session?.user) {
-      return new ChatbotError("unauthorized:chat").toResponse();
+    if (resolved instanceof ChatbotError) {
+      return resolved.toResponse();
     }
+
+    const { userId: effectiveUserId, userType: effectiveUserType, eventContext: validatedEventContext } = resolved;
 
     const chatModel = allowedModelIds.has(selectedChatModel)
       ? selectedChatModel
@@ -86,10 +95,10 @@ export async function POST(request: Request) {
 
     await checkIpRateLimit(ipAddress(request));
 
-    const userType: UserType = session.user.type;
+    const userType: UserType = effectiveUserType;
 
     const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
+      id: effectiveUserId,
       differenceInHours: 1,
     });
 
@@ -104,14 +113,14 @@ export async function POST(request: Request) {
     let titlePromise: Promise<string> | null = null;
 
     if (chat) {
-      if (chat.userId !== session.user.id) {
+      if (chat.userId !== effectiveUserId) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
       messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
       await saveChat({
         id,
-        userId: session.user.id,
+        userId: effectiveUserId,
         title: "New chat",
         visibility: selectedVisibilityType,
       });
@@ -180,7 +189,6 @@ export async function POST(request: Request) {
       });
     }
 
-    const modelConfig = chatModels.find((m) => m.id === chatModel);
     const modelCapabilities = await getCapabilities();
     const capabilities = modelCapabilities[chatModel];
     const isReasoningModel = capabilities?.reasoning === true;
@@ -188,17 +196,32 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    // Build a minimal session-like object for tools that need session.user.id
+    const effectiveSession = {
+      user: { id: effectiveUserId, type: effectiveUserType },
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
       execute: async ({ writer: dataStream }) => {
+        const eventTools = validatedEventContext
+          ? createEventTools(validatedEventContext)
+          : {};
+        const eventToolNames = Object.keys(eventTools) as Array<keyof typeof eventTools>;
+
         const result = streamText({
           model: getLanguageModel(chatModel),
-          system: systemPrompt({ requestHints, supportsTools }),
+          system: validatedEventContext
+            ? eventSystemPrompt({ requestHints, supportsTools, ctx: validatedEventContext })
+            : systemPrompt({ requestHints, supportsTools }),
           messages: modelMessages,
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             isReasoningModel && !supportsTools
               ? []
+              : validatedEventContext
+              ? eventToolNames
               : [
                   "getWeather",
                   "createDocument",
@@ -206,32 +229,25 @@ export async function POST(request: Request) {
                   "updateDocument",
                   "requestSuggestions",
                 ],
-          providerOptions: {
-            ...(modelConfig?.gatewayOrder && {
-              gateway: { order: modelConfig.gatewayOrder },
-            }),
-            ...(modelConfig?.reasoningEffort && {
-              openai: { reasoningEffort: modelConfig.reasoningEffort },
-            }),
-          },
           tools: {
             getWeather,
             createDocument: createDocument({
-              session,
+              session: effectiveSession,
               dataStream,
               modelId: chatModel,
             }),
-            editDocument: editDocument({ dataStream, session }),
+            editDocument: editDocument({ dataStream, session: effectiveSession }),
             updateDocument: updateDocument({
-              session,
+              session: effectiveSession,
               dataStream,
               modelId: chatModel,
             }),
             requestSuggestions: requestSuggestions({
-              session,
+              session: effectiveSession,
               dataStream,
               modelId: chatModel,
             }),
+            ...eventTools,
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

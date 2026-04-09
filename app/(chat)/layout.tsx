@@ -29,9 +29,15 @@ async function SidebarShell({ children }: { children: React.ReactNode }) {
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
   const isCollapsed = cookieStore.get("sidebar_state")?.value !== "true";
 
+  const effectiveUser =
+    session?.user ??
+    (process.env.NEXT_PUBLIC_ENABLE_EVENT_AUTH === "true"
+      ? ({ id: "", email: "" } as any)
+      : undefined);
+
   return (
     <SidebarProvider defaultOpen={!isCollapsed}>
-      <AppSidebar user={session?.user} />
+      <AppSidebar user={effectiveUser} />
       <SidebarInset>
         <Toaster
           position="top-center"

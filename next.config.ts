@@ -49,6 +49,25 @@ const nextConfig: NextConfig = {
     inlineCss: true,
     turbopackFileSystemCacheForDev: true,
   },
+  async headers() {
+    // NEXT_PUBLIC_ALLOWED_ORIGINS: comma-separated list of portal origins, e.g. "https://portal.com,https://staging.portal.com"
+    // Use * to allow all origins.
+    const rawOrigins = process.env.NEXT_PUBLIC_ALLOWED_ORIGINS ?? "*";
+    const frameAncestors =
+      rawOrigins === "*"
+        ? "frame-ancestors *"
+        : `frame-ancestors 'self' ${rawOrigins.split(",").map((o) => o.trim()).join(" ")}`;
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Content-Security-Policy", value: frameAncestors },
+        ],
+      },
+      // NOTE: Access-Control-Allow-Origin is handled dynamically in middleware
+      // because it must reflect a single origin per response (multi-origin support).
+    ];
+  },
 };
 
 export default withBotId(nextConfig);

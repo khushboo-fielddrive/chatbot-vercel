@@ -117,7 +117,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     <span className="font-medium">New chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {user && (
+                {user && process.env.NEXT_PUBLIC_ENABLE_DELETE_ALL_CHATS !== "false" && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
@@ -135,7 +135,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           <SidebarHistory user={user} />
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border pt-2 pb-3">
-          {user && <SidebarUserNav user={user} />}
+          {user && process.env.NEXT_PUBLIC_ENABLE_USER_PROFILE !== "false" && <SidebarUserNav user={user} />}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

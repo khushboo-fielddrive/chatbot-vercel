@@ -46,6 +46,7 @@ export function ChatShell() {
     setCurrentModelId,
     showCreditCardAlert,
     setShowCreditCardAlert,
+    eventAuthReady,
   } = useActiveChat();
 
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(
@@ -108,7 +109,7 @@ export function ChatShell() {
             />
 
             <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-              {!isReadonly && (
+              {!isReadonly && eventAuthReady && (
                 <MultimodalInput
                   attachments={attachments}
                   chatId={chatId}

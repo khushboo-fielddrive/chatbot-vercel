@@ -66,42 +66,44 @@ const PureChatItem = ({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end" side="bottom">
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="cursor-pointer">
-              <ShareIcon />
-              <span>Share</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem
-                  className="cursor-pointer flex-row justify-between"
-                  onClick={() => {
-                    setVisibilityType("private");
-                  }}
-                >
-                  <div className="flex flex-row items-center gap-2">
-                    <LockIcon size={12} />
-                    <span>Private</span>
-                  </div>
-                  {visibilityType === "private" ? (
-                    <CheckCircleFillIcon />
-                  ) : null}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer flex-row justify-between"
-                  onClick={() => {
-                    setVisibilityType("public");
-                  }}
-                >
-                  <div className="flex flex-row items-center gap-2">
-                    <GlobeIcon />
-                    <span>Public</span>
-                  </div>
-                  {visibilityType === "public" ? <CheckCircleFillIcon /> : null}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
+          {process.env.NEXT_PUBLIC_ENABLE_CHAT_VISIBILITY !== "false" && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer">
+                <ShareIcon />
+                <span>Share</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem
+                    className="cursor-pointer flex-row justify-between"
+                    onClick={() => {
+                      setVisibilityType("private");
+                    }}
+                  >
+                    <div className="flex flex-row items-center gap-2">
+                      <LockIcon size={12} />
+                      <span>Private</span>
+                    </div>
+                    {visibilityType === "private" ? (
+                      <CheckCircleFillIcon />
+                    ) : null}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer flex-row justify-between"
+                    onClick={() => {
+                      setVisibilityType("public");
+                    }}
+                  >
+                    <div className="flex flex-row items-center gap-2">
+                      <GlobeIcon />
+                      <span>Public</span>
+                    </div>
+                    {visibilityType === "public" ? <CheckCircleFillIcon /> : null}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          )}
 
           <DropdownMenuItem
             onSelect={() => onDelete(chat.id)}
