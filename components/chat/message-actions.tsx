@@ -54,7 +54,7 @@ export function PureMessageActions({
         <div className="flex items-center gap-0.5">
           {onEdit && (
             <Action
-              className="size-7 text-muted-foreground/50 hover:text-foreground"
+              className="size-7 text-primary/70 hover:text-primary"
               data-testid="message-edit-button"
               onClick={onEdit}
               tooltip="Edit"
@@ -63,7 +63,7 @@ export function PureMessageActions({
             </Action>
           )}
           <Action
-            className="size-7 text-muted-foreground/50 hover:text-foreground"
+            className="size-7 text-primary/70 hover:text-primary"
             onClick={handleCopy}
             tooltip="Copy"
           >
@@ -77,7 +77,7 @@ export function PureMessageActions({
   return (
     <Actions className="-ml-0.5 opacity-0 transition-opacity duration-150 group-hover/message:opacity-100">
       <Action
-        className="text-muted-foreground/50 hover:text-foreground"
+        className="text-primary/70 hover:text-primary"
         onClick={handleCopy}
         tooltip="Copy"
       >
@@ -85,7 +85,7 @@ export function PureMessageActions({
       </Action>
 
       <Action
-        className="text-muted-foreground/50 hover:text-foreground"
+        className="text-primary/70 hover:text-primary"
         data-testid="message-upvote"
         disabled={vote?.isUpvoted}
         onClick={() => {
@@ -139,7 +139,7 @@ export function PureMessageActions({
       </Action>
 
       <Action
-        className="text-muted-foreground/50 hover:text-foreground"
+        className="text-primary/70 hover:text-primary"
         data-testid="message-downvote"
         disabled={vote && !vote.isUpvoted}
         onClick={() => {

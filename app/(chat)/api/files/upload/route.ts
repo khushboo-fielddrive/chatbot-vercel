@@ -2,7 +2,8 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/app/(auth)/auth";
+import { resolveUser } from "@/lib/auth/resolve-user";
+import { ChatbotError } from "@/lib/errors";
 
 const FileSchema = z.object({
   file: z
@@ -16,9 +17,8 @@ const FileSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!session) {
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

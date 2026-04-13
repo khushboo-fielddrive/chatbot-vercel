@@ -10,7 +10,6 @@ import {
 import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
-import { auth } from "@/app/(auth)/auth";
 import type { UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import { resolveUser } from "@/lib/auth/resolve-user";
@@ -366,15 +365,14 @@ export async function DELETE(request: Request) {
     return new ChatbotError("bad_request:api").toResponse();
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
     return new ChatbotError("unauthorized:chat").toResponse();
   }
 
   const chat = await getChatById({ id });
 
-  if (chat?.userId !== session.user.id) {
+  if (chat?.userId !== resolved.userId) {
     return new ChatbotError("forbidden:chat").toResponse();
   }
 

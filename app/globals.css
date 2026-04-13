@@ -9,6 +9,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme inline {
+  --font-sans: var(--font-poppins), sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -54,8 +55,8 @@
   --card-foreground: oklch(0.12 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.12 0 0);
-  --primary: oklch(0.12 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.68 0.19 128);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.965 0 0);
   --secondary-foreground: oklch(0.38 0 0);
   --muted: oklch(0.94 0 0);
@@ -73,8 +74,8 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.97 0 0);
   --sidebar-foreground: oklch(0.38 0 0);
-  --sidebar-primary: oklch(0.12 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.68 0.19 128);
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.12 0 0 / 0.06);
   --sidebar-accent-foreground: oklch(0.12 0 0);
   --sidebar-border: oklch(0.88 0 0);
@@ -101,8 +102,8 @@
   --card-foreground: oklch(0.94 0 0);
   --popover: oklch(0.225 0 0);
   --popover-foreground: oklch(0.94 0 0);
-  --primary: oklch(0.94 0 0);
-  --primary-foreground: oklch(0.195 0 0);
+  --primary: oklch(0.78 0.16 128);
+  --primary-foreground: oklch(0.15 0 0);
   --secondary: oklch(0.26 0 0);
   --secondary-foreground: oklch(0.75 0 0);
   --muted: oklch(0.165 0 0);
@@ -120,8 +121,8 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.175 0 0);
   --sidebar-foreground: oklch(0.78 0 0);
-  --sidebar-primary: oklch(0.94 0 0);
-  --sidebar-primary-foreground: oklch(0.195 0 0);
+  --sidebar-primary: oklch(0.78 0.16 128);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
   --sidebar-accent: oklch(0.94 0 0 / 0.06);
   --sidebar-accent-foreground: oklch(0.94 0 0);
   --sidebar-border: oklch(0.25 0 0);

@@ -1,17 +1,18 @@
 "use server";
 
 import { generateText, type UIMessage } from "ai";
-import { cookies } from "next/headers";
-import { auth } from "@/app/(auth)/auth";
+import { cookies, headers } from "next/headers";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { getTitleModel } from "@/lib/ai/providers";
+import { resolveUser } from "@/lib/auth/resolve-user";
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getChatById,
   getMessageById,
   updateChatVisibilityById,
 } from "@/lib/db/queries";
+import { ChatbotError } from "@/lib/errors";
 import { getTextFromMessage } from "@/lib/utils";
 
 export async function saveChatModelAsCookie(model: string) {
@@ -36,10 +37,13 @@ export async function generateTitleFromUserMessage({
 }
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const headersList = await headers();
+  const resolved = await resolveUser(new Request("http://localhost", { headers: headersList }));
+  if (resolved instanceof ChatbotError) {
     throw new Error("Unauthorized");
   }
+
+  const { userId } = resolved;
 
   const [message] = await getMessageById({ id });
   if (!message) {
@@ -47,7 +51,7 @@ export async function deleteTrailingMessages({ id }: { id: string }) {
   }
 
   const chat = await getChatById({ id: message.chatId });
-  if (!chat || chat.userId !== session.user.id) {
+  if (!chat || chat.userId !== userId) {
     throw new Error("Unauthorized");
   }
 
@@ -64,13 +68,16 @@ export async function updateChatVisibility({
   chatId: string;
   visibility: VisibilityType;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const headersList = await headers();
+  const resolved = await resolveUser(new Request("http://localhost", { headers: headersList }));
+  if (resolved instanceof ChatbotError) {
     throw new Error("Unauthorized");
   }
 
+  const { userId } = resolved;
+
   const chat = await getChatById({ id: chatId });
-  if (!chat || chat.userId !== session.user.id) {
+  if (!chat || chat.userId !== userId) {
     throw new Error("Unauthorized");
   }
 

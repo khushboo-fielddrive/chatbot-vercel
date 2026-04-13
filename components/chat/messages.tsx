@@ -6,7 +6,9 @@ import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useDataStream } from "./data-stream-provider";
-import { Greeting } from "./greeting";
+import dynamic from "next/dynamic";
+
+const Greeting = dynamic(() => import("./greeting").then((m) => m.Greeting), { ssr: false });
 import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {

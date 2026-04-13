@@ -13,8 +13,8 @@ export const guestRegex = /^guest-\d+$/;
 export const DUMMY_PASSWORD = generateDummyPassword();
 
 export const suggestions = [
-  "Give me the Event Summary",
-  "Share me the session details",
-  "How many Attendees checked-in so far?",
-  "We can customised on any thing",
+  "What's the check-in rate?",
+  "Which session is the most crowded?",
+  "Give me attendee Summary?",
+  "Breakdown by category type?"
 ];

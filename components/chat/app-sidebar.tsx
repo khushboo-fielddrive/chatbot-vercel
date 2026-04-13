@@ -113,14 +113,14 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     }}
                     tooltip="New Chat"
                   >
-                    <PenSquareIcon className="size-4" />
+                    <PenSquareIcon className="size-4 text-primary" />
                     <span className="font-medium">New chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 {user && process.env.NEXT_PUBLIC_ENABLE_DELETE_ALL_CHATS !== "false" && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
+                      className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-transparent hover:text-primary"
                       onClick={() => setShowDeleteAllDialog(true)}
                       tooltip="Delete All Chats"
                     >

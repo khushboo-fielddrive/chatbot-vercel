@@ -45,6 +45,9 @@ async function SidebarShell({ children }: { children: React.ReactNode }) {
           toastOptions={{
             className:
               "!bg-card !text-foreground !border-border/50 !shadow-[var(--shadow-float)]",
+            style: {
+              "--success-color": "var(--primary)",
+            } as React.CSSProperties,
           }}
         />
         <Suspense fallback={<div className="flex h-dvh" />}>
