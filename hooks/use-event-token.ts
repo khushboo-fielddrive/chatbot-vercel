@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const EVENT_AUTH_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_EVENT_AUTH === "true";
-
 export type EventAuthPayload = {
   userId: string;
   eventId: number;
@@ -13,12 +10,9 @@ export type EventAuthPayload = {
 };
 
 export function useEventToken() {
-  // When feature flag is off, ready immediately — no token needed
-  const [ready, setReady] = useState(!EVENT_AUTH_ENABLED);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-
-    if (!EVENT_AUTH_ENABLED) return;
 
     // If we already have a valid token from this session, mark ready immediately.
     // Still register the listener below so the portal can refresh the token.

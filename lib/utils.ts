@@ -14,11 +14,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getEventAuthHeaders(): Record<string, string> | undefined {
-  if (
-    typeof window === "undefined" ||
-    process.env.NEXT_PUBLIC_ENABLE_EVENT_AUTH !== "true"
-  )
-    return undefined;
+  if (typeof window === "undefined") return undefined;
   const raw = sessionStorage.getItem("event-auth");
   if (!raw) return undefined;
   try {
