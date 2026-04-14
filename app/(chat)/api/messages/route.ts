@@ -1,5 +1,5 @@
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import { ChatbotError } from "@/lib/errors";
 import { convertToUIMessages } from "@/lib/utils";
 

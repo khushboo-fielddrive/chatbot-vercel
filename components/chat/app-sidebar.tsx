@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { User } from "next-auth";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
@@ -17,7 +16,6 @@ import {
   getChatHistoryPaginationKey,
   SidebarHistory,
 } from "@/components/chat/sidebar-history";
-import { SidebarUserNav } from "@/components/chat/sidebar-user-nav";
 import {
   Sidebar,
   SidebarContent,
@@ -44,7 +42,7 @@ import {
 } from "../ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
-export function AppSidebar({ user }: { user: User | undefined }) {
+export function AppSidebar() {
   const router = useRouter();
   const { setOpenMobile, toggleSidebar } = useSidebar();
   const { mutate } = useSWRConfig();
@@ -117,7 +115,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     <span className="font-medium">New chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {user && process.env.NEXT_PUBLIC_ENABLE_DELETE_ALL_CHATS !== "false" && (
+                {process.env.NEXT_PUBLIC_ENABLE_DELETE_ALL_CHATS !== "false" && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-transparent hover:text-primary"
@@ -132,10 +130,9 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-          <SidebarHistory user={user} />
+          <SidebarHistory />
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border pt-2 pb-3">
-          {user && process.env.NEXT_PUBLIC_ENABLE_USER_PROFILE !== "false" && <SidebarUserNav user={user} />}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

@@ -7,8 +7,6 @@ import { DataStreamProvider } from "@/components/chat/data-stream-provider";
 import { ChatShell } from "@/components/chat/shell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ActiveChatProvider } from "@/hooks/use-active-chat";
-import { auth } from "../(auth)/auth";
-
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -26,18 +24,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 
 async function SidebarShell({ children }: { children: React.ReactNode }) {
-  const [session, cookieStore] = await Promise.all([auth(), cookies()]);
+  const cookieStore = await cookies();
   const isCollapsed = cookieStore.get("sidebar_state")?.value !== "true";
-
-  const effectiveUser =
-    session?.user ??
-    (process.env.NEXT_PUBLIC_ENABLE_EVENT_AUTH === "true"
-      ? ({ id: "", email: "" } as any)
-      : undefined);
 
   return (
     <SidebarProvider defaultOpen={!isCollapsed}>
-      <AppSidebar user={effectiveUser} />
+      <AppSidebar />
       <SidebarInset>
         <Toaster
           position="top-center"

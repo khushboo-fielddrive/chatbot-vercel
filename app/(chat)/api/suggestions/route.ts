@@ -1,4 +1,4 @@
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import { getSuggestionsByDocumentId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 

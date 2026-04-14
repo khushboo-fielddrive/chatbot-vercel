@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { deleteAllChatsByUserId, getChatsByUserId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;

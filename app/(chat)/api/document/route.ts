@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ArtifactKind } from "@/components/chat/artifact";
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,

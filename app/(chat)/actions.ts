@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { getTitleModel } from "@/lib/ai/providers";
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getChatById,

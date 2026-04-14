@@ -12,7 +12,7 @@ import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import type { UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import {
   allowedModelIds,
   chatModels,

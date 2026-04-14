@@ -2,7 +2,7 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { resolveUser } from "@/lib/auth/resolve-user";
+import { resolveUser } from "@/app/(auth)/auth";
 import { ChatbotError } from "@/lib/errors";
 
 const FileSchema = z.object({
