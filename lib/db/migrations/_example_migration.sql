@@ -1,0 +1,24 @@
+-- EXAMPLE MIGRATION
+-- This file is a template showing how to write migrations when you need them.
+-- Delete this file before creating real migrations.
+--
+-- When to use migrations:
+--   - Your production database has real data
+--   - You need to alter the schema without losing data
+--
+-- How to create a migration:
+--   1. Update the schema in lib/db/schema.ts
+--   2. Run: pnpm db:generate
+--      This auto-generates a migration SQL file from the schema diff
+--   3. Review the generated SQL in lib/db/migrations/
+--   4. Run: pnpm db:migrate
+--   5. Optional: In the build command you can update: "tsx lib/db/migrate && next build".
+--
+-- For fresh databases (no data), just use: pnpm db:push
+-- This syncs the DB directly from schema.ts without migration files.
+
+-- Example: adding a column
+-- ALTER TABLE "Chat" ADD COLUMN IF NOT EXISTS "newColumn" text;
+
+-- Example: adding an index
+-- CREATE INDEX IF NOT EXISTS "chat_event_idx" ON "Chat"("eventId") WHERE "eventId" IS NOT NULL;
