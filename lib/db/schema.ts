@@ -9,6 +9,7 @@ import {
   timestamp,
   uuid,
   varchar,
+  numeric
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("User", {
@@ -35,6 +36,8 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
+  eventId: numeric("eventId"),
+  accountId: numeric("accountId"),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

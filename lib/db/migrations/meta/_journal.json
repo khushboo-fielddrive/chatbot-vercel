@@ -29,6 +29,13 @@
       "when": 1776174779216,
       "tag": "0003_complete_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1744963200000,
+      "tag": "0004_add_event_account_to_chat",
+      "breakpoints": true
     }
   ]
 }

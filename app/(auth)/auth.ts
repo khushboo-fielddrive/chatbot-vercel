@@ -8,7 +8,7 @@ export type ResolvedUser = {
   userId: string;
   userType: UserType;
   isEventAuth: boolean;
-  eventContext?: EventContext;
+  eventContext: EventContext;
 };
 
 export async function resolveUser(
@@ -46,17 +46,25 @@ export async function resolveUser(
 
   let eventContext: EventContext | undefined;
   const rawEventId = request.headers.get("x-event-id");
-  if (rawEventId) {
-    const eventResult = await fetchEventContext(Number(rawEventId), accountId);
-    if (!eventResult.ok) {
-      return new ChatbotError("forbidden:chat");
-    }
-    eventContext = eventResult.ctx;
+
+  if (!rawEventId) {
+    return new ChatbotError("forbidden:chat");
   }
 
+  const eventResult = await fetchEventContext(Number(rawEventId), accountId);
+  if (!eventResult.ok) {
+    return new ChatbotError("forbidden:chat");
+  }
+
+  eventContext = eventResult.ctx;
   const portalEmail =
     portalUser.email ?? `portal-user-${portalUserId}@event.internal`;
   const userId = await upsertPortalUser(portalEmail);
 
-  return { userId, userType: "regular", isEventAuth: true, eventContext };
+  return {
+    userId,
+    userType: "regular",
+    isEventAuth: true,
+    eventContext
+  };
 }

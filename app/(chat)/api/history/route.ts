@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { deleteAllChatsByUserId, getChatsByUserId } from "@/lib/db/queries";
+import { deleteAllChatsByUserId, getChatsByEventId, getChatsByUserId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 import { resolveUser } from "@/app/(auth)/auth";
 
@@ -25,8 +25,15 @@ export async function GET(request: NextRequest) {
     return resolved.toResponse();
   }
 
-  const chats = await getChatsByUserId({
-    id: resolved.userId,
+  // const chats = await getChatsByUserId({
+  //   id: resolved.userId,
+  //   limit,
+  //   startingAfter,
+  //   endingBefore,
+  // });
+  const chats = await getChatsByEventId({
+    userId: String(resolved.userId),
+    eventId: String(resolved.eventContext.eventId),
     limit,
     startingAfter,
     endingBefore,
