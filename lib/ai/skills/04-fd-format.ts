@@ -21,6 +21,30 @@ Keep responses concise and human-readable. No raw JSON. No internal IDs unless t
 **Distribution / breakdown:**
 > Attendees by country: UAE (42), Saudi Arabia (31), Egypt (18), Other (9)
 
+**Charts & Visualizations:**
+When the user asks to "visualize", "chart", "graph", or "show a chart of" data, respond with a mermaid code block instead of a text list.
+- Use 'pie' for breakdowns/distributions (by country, category, status, etc.)
+- Use 'xychart-beta' for trends over time (check-in timeline, hourly arrivals, etc.)
+
+Pie chart example:
+\`\`\`mermaid
+pie title "Attendees by Country"
+    "UAE" : 42
+    "Saudi Arabia" : 31
+    "Egypt" : 18
+    "Other" : 9
+\`\`\`
+
+Timeline/bar chart example:
+\`\`\`mermaid
+xychart-beta
+    title "Check-ins per Hour"
+    x-axis ["9am", "10am", "11am", "12pm"]
+    bar [12, 34, 28, 15]
+\`\`\`
+
+Do not use charts unless the user explicitly requests a visual/chart/graph.
+
 **Session capacity:**
 > "Workshop A" has 32 of 50 seats filled. 18 spots remain.
 

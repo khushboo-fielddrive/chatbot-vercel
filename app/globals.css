@@ -499,3 +499,33 @@ textarea:focus-visible {
 [data-testid="artifact"] {
   isolation: isolate;
 }
+
+/* Mermaid diagram styling — reduce white space, fill chat width */
+[data-language="mermaid"] {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100%;
+  min-height: 320px;
+}
+
+/* Hide the "mermaid" language label */
+[data-streamdown="mermaid-block"] > div:first-child:not([data-streamdown]) {
+  display: none !important;
+}
+
+/* Fix action buttons position after hiding label */
+[data-streamdown="mermaid-block"] > div:has([data-streamdown="mermaid-block-actions"]) {
+  margin-top: 0 !important;
+  position: absolute !important;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 10;
+}
+
+[data-language="mermaid"] svg {
+  width: 100% !important;
+  min-height: 320px;
+  height: auto !important;
+  margin: 0 auto;
+  display: block;
+}

@@ -43,6 +43,7 @@ const content = `## Tool Usage Patterns
 ### "Show me the check-in trend / timeline"
 1. \`get_checkin_timeline(slot_mins=60)\` — hourly buckets by default
 2. Use \`slot_mins=15\` for 15-minute granularity if the user wants a more detailed view
+3. If the user asks to "chart" or "graph" the trend, render as an xychart-beta mermaid diagram (see Response Format)
 
 ### "How are sessions performing across the event?"
 1. \`get_session_attendance_stats()\` — fill rates for all sessions in one call`;

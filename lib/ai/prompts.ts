@@ -48,7 +48,12 @@ CRITICAL RULES:
 
 export const regularPrompt = `You are a helpful assistant. Keep responses concise and direct.
 
-When asked to write, create, or build something, do it immediately. Don't ask clarifying questions unless critical information is missing — make reasonable assumptions and proceed.`;
+When asked to write, create, or build something, do it immediately. Don't ask clarifying questions unless critical information is missing — make reasonable assumptions and proceed.
+
+When asked to visualize data as a chart or graph, use a mermaid code block:
+- Pie charts: use the "pie" diagram type
+- Bar or line charts: use the "xychart-beta" diagram type
+Do not output raw data tables when a chart was requested.`;
 
 export type RequestHints = {
   latitude: Geo["latitude"];
