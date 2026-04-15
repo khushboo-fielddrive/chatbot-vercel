@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     return new ChatbotError("bad_request:api").toResponse();
   }
 
-    // console.log("[api/chat/route.ts] POST requestBody:", requestBody);
+  // console.log("[api/chat/route.ts] POST requestBody:", requestBody);
 
 
   try {
@@ -122,6 +122,8 @@ export async function POST(request: Request) {
         userId: effectiveUserId,
         title: "New chat",
         visibility: selectedVisibilityType,
+        eventId: String(validatedEventContext.eventId),
+        accountId: String(validatedEventContext.accountId),
       });
       titlePromise = generateTitleFromUserMessage({ message });
     }
@@ -220,8 +222,8 @@ export async function POST(request: Request) {
             isReasoningModel && !supportsTools
               ? []
               : validatedEventContext
-              ? eventToolNames
-              : [
+                ? eventToolNames
+                : [
                   "getWeather",
                   "createDocument",
                   "editDocument",
