@@ -65,11 +65,11 @@ export function AppSidebar() {
   return (
     <>
       <Sidebar collapsible="icon">
-        <SidebarHeader className="pb-0 pt-3">
+        <SidebarHeader className="pb-3 pt-3">
           <SidebarMenu>
             <SidebarMenuItem className="flex flex-row items-center justify-between">
               <div className="group/logo relative flex items-center justify-center">
-                <SidebarMenuButton
+                {/* <SidebarMenuButton
                   asChild
                   className="size-8 !px-0 items-center justify-center group-data-[collapsible=icon]:group-hover/logo:opacity-0"
                   tooltip="Chatbot"
@@ -77,20 +77,22 @@ export function AppSidebar() {
                   <Link href="/" onClick={() => setOpenMobile(false)}>
                     <MessageSquareIcon className="size-4 text-sidebar-foreground/50" />
                   </Link>
-                </SidebarMenuButton>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      className="pointer-events-none absolute inset-0 size-8 opacity-0 group-data-[collapsible=icon]:pointer-events-auto group-data-[collapsible=icon]:group-hover/logo:opacity-100"
-                      onClick={() => toggleSidebar()}
-                    >
-                      <PanelLeftIcon className="size-4" />
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent className="hidden md:block" side="right">
-                    Open sidebar
-                  </TooltipContent>
-                </Tooltip>
+                </SidebarMenuButton> */}
+                <div className="hidden group-data-[collapsible=icon]:block">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        className="pointer-events-none size-8 !px-0 items-center justify-center inset-0 group-data-[collapsible=icon]:pointer-events-auto group-data-[collapsible=icon]:group-hover/logo:opacity-100"
+                        onClick={() => toggleSidebar()}
+                      >
+                        <PanelLeftIcon className="size-4 text-sidebar-foreground/60 transition-colors duration-150 group-hover/logo:text-sidebar-foreground" />
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent className="hidden md:block bg-primary text-primary-foreground" side="right">
+                      Open sidebar
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
               <div className="group-data-[collapsible=icon]:hidden">
                 <SidebarTrigger className="text-sidebar-foreground/60 transition-colors duration-150 hover:text-sidebar-foreground" />
