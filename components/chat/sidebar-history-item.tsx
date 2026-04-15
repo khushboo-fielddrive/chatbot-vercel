@@ -1,3 +1,4 @@
+import { features } from "@/lib/config/features";
 import Link from "next/link";
 import { memo } from "react";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
@@ -66,7 +67,7 @@ const PureChatItem = ({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end" side="bottom">
-          {process.env.NEXT_PUBLIC_ENABLE_CHAT_VISIBILITY !== "false" && (
+          {features.showChatVisibility && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer">
                 <ShareIcon />

@@ -1,5 +1,6 @@
 "use client";
 
+import { features } from "@/lib/config/features";
 import { PanelLeftIcon } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ function PureChatHeader({
         <PanelLeftIcon className="size-4" />
       </Button>
 
-      {!isReadonly && process.env.NEXT_PUBLIC_ENABLE_CHAT_VISIBILITY !== "false" && (
+      {!isReadonly && features.showChatVisibility && (
         <VisibilitySelector
           chatId={chatId}
           selectedVisibilityType={selectedVisibilityType}

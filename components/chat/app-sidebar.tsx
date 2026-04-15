@@ -1,5 +1,6 @@
 "use client";
 
+import { features } from "@/lib/config/features";
 import {
   MessageSquareIcon,
   PanelLeftIcon,
@@ -117,7 +118,7 @@ export function AppSidebar() {
                     <span className="font-medium">New chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {process.env.NEXT_PUBLIC_ENABLE_DELETE_ALL_CHATS !== "false" && (
+                {features.showDeleteAllChats && (
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-transparent hover:text-primary"

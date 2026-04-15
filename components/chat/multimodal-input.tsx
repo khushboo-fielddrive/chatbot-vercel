@@ -1,5 +1,6 @@
 "use client";
 
+import { features } from "@/lib/config/features";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
@@ -517,14 +518,14 @@ function PureMultimodalInput({
         />
         <PromptInputFooter className="px-3 pb-3">
           <PromptInputTools>
-            {process.env.NEXT_PUBLIC_ENABLE_ATTACHMENTS === "true" && (
+            {features.showAttachments && (
               <AttachmentsButton
                 fileInputRef={fileInputRef}
                 selectedModelId={selectedModelId}
                 status={status}
               />
             )}
-            {process.env.NEXT_PUBLIC_ENABLE_MODEL_SELECTOR === "true" && (
+            {features.showModelSelector && (
               <ModelSelectorCompact
                 onModelChange={onModelChange}
                 selectedModelId={selectedModelId}
