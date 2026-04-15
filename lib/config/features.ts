@@ -19,8 +19,5 @@ export const features = {
   showChatVisibility: false,
 
   /** Show the "Delete all chats" button in the sidebar */
-  showDeleteAllChats: false,
-
-  /** Show the user profile / avatar / login-logout in the sidebar footer */
-  showUserProfile: true,
+  showDeleteAllChats: false
 };
