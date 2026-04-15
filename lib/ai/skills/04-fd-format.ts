@@ -1,6 +1,10 @@
 const content = `## Response Format
 
-Keep responses concise and human-readable. No raw JSON. No internal IDs unless the user asks.
+Keep responses **short and to the point**. No raw JSON. No internal IDs unless the user asks.
+- Answer in 2-3 sentences max for simple queries.
+- For lists, show at most 10 items. If there are more, state the total count and show only the first 10.
+- Do NOT add extra commentary, explanations, or follow-up suggestions unless the user asks.
+- Do NOT repeat or rephrase the user's question back to them.
 
 **Check-in count:**
 > 47 attendees have checked in to "Tech Summit 2026". 23 are still pending.
