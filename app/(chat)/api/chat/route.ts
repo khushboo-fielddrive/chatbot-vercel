@@ -34,6 +34,7 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getMostRecentChatByUserAndEvent,
   saveChat,
   saveMessages,
   updateChatTitleById,
@@ -74,7 +75,8 @@ export async function POST(request: Request) {
 
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
+    let { id } = requestBody;
+    const { message, messages, selectedChatModel, selectedVisibilityType } =
       requestBody;
 
     const [, resolved] = await Promise.all([
@@ -107,14 +109,26 @@ export async function POST(request: Request) {
 
     const isToolApprovalFlow = Boolean(messages);
 
-    const chat = await getChatById({ id });
+    let chatRecord = await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
 
-    if (chat) {
-      if (chat.userId !== effectiveUserId) {
+    // For event chats: resume the most recent chat if the client sends a new UUID
+    if (!chatRecord && validatedEventContext && message?.role === "user") {
+      const existing = await getMostRecentChatByUserAndEvent({
+        userId: effectiveUserId,
+        eventId: String(validatedEventContext.eventId),
+      });
+      if (existing) {
+        chatRecord = existing;
+      }
+    }
+
+    if (chatRecord) {
+      if (chatRecord.userId !== effectiveUserId) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
+      id = chatRecord.id;
       messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
       await saveChat({
@@ -122,8 +136,8 @@ export async function POST(request: Request) {
         userId: effectiveUserId,
         title: "New chat",
         visibility: selectedVisibilityType,
-        eventId: String(validatedEventContext.eventId),
-        accountId: String(validatedEventContext.accountId),
+        eventId: validatedEventContext ? String(validatedEventContext.eventId) : undefined,
+        accountId: String(validatedEventContext!.accountId),
       });
       titlePromise = generateTitleFromUserMessage({ message });
     }

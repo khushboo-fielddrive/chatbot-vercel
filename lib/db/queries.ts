@@ -106,7 +106,7 @@ export async function saveChat({
   userId: string;
   title: string;
   visibility: VisibilityType;
-  eventId: string;
+  eventId?: string;
   accountId: string;
 }) {
   try {
@@ -143,12 +143,16 @@ export async function deleteChatById({ id }: { id: string }) {
   }
 }
 
-export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
+export async function deleteAllChatsByUserId({ userId, eventId }: { userId: string; eventId?: string }) {
   try {
+    const condition = eventId
+      ? and(eq(chat.userId, userId), eq(chat.eventId, eventId))
+      : eq(chat.userId, userId);
+
     const userChats = await db
       .select({ id: chat.id })
       .from(chat)
-      .where(eq(chat.userId, userId));
+      .where(condition);
 
     if (userChats.length === 0) {
       return { deletedCount: 0 };
@@ -162,14 +166,114 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
 
     const deletedChats = await db
       .delete(chat)
-      .where(eq(chat.userId, userId))
+      .where(condition)
       .returning();
 
     return { deletedCount: deletedChats.length };
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
-      "Failed to delete all chats by user id"
+      "Failed to delete chats"
+    );
+  }
+}
+
+export async function getMostRecentChatByUserAndEvent({
+  userId,
+  eventId,
+}: {
+  userId: string;
+  eventId: string;
+}) {
+  try {
+    const [result] = await db
+      .select()
+      .from(chat)
+      .where(and(eq(chat.userId, userId), eq(chat.eventId, eventId)))
+      .orderBy(desc(chat.createdAt))
+      .limit(1);
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get most recent chat by user and event"
+    );
+  }
+}
+
+export async function getChatsByEventId({
+  userId,
+  eventId,
+  limit,
+  startingAfter,
+  endingBefore,
+}: {
+  userId: string;
+  eventId: string;
+  limit: number;
+  startingAfter: string | null;
+  endingBefore: string | null;
+}) {
+  try {
+    const extendedLimit = limit + 1;
+    const query = (whereCondition?: SQL<unknown>) =>
+      db
+        .select()
+        .from(chat)
+        .where(
+          whereCondition
+            ? and(whereCondition, eq(chat.userId, userId), eq(chat.eventId, eventId))
+            : and(eq(chat.userId, userId), eq(chat.eventId, eventId))
+        )
+        .orderBy(desc(chat.createdAt))
+        .limit(extendedLimit);
+
+    let filteredChats: Chat[] = [];
+
+    if (startingAfter) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(and(eq(chat.userId, userId), eq(chat.id, startingAfter)))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatbotError(
+          "not_found:database",
+          `Chat with id ${startingAfter} not found`
+        );
+      }
+
+      filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+    } else if (endingBefore) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(and(eq(chat.userId, userId), eq(chat.id, endingBefore)))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatbotError(
+          "not_found:database",
+          `Chat with id ${endingBefore} not found`
+        );
+      }
+
+      filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+    } else {
+      filteredChats = await query();
+    }
+
+    const hasMore = filteredChats.length > limit;
+
+    return {
+      chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+      hasMore,
+    };
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get chats by event"
     );
   }
 }

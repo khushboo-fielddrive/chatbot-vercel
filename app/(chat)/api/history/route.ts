@@ -48,7 +48,10 @@ export async function DELETE(request: NextRequest) {
     return resolved.toResponse();
   }
 
-  const result = await deleteAllChatsByUserId({ userId: resolved.userId });
+  const result = await deleteAllChatsByUserId({
+    userId: resolved.userId,
+    eventId: resolved.eventContext ? String(resolved.eventContext.eventId) : undefined,
+  });
 
   return Response.json(result, { status: 200 });
 }

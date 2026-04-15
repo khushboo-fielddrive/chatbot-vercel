@@ -1,2 +1,2 @@
-ALTER TABLE "Chat" ADD COLUMN IF NOT EXISTS "eventId" numeric;
-ALTER TABLE "Chat" ADD COLUMN IF NOT EXISTS "accountId" numeric;
+ALTER TABLE "Chat" ADD COLUMN IF NOT EXISTS "eventId" text;
+ALTER TABLE "Chat" ADD COLUMN IF NOT EXISTS "accountId" text;
