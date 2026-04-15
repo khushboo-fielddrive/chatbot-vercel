@@ -32,7 +32,6 @@ import {
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
-import id from "zod/v4/locales/id.cjs";
 
 const client = postgres(process.env.POSTGRES_URL ?? "");
 const db = drizzle(client);
