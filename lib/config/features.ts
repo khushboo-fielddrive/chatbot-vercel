@@ -16,7 +16,7 @@ export const features = {
   showAttachments: false,
 
   /** Show the public/private visibility selector on chats */
-  showChatVisibility: true,
+  showChatVisibility: false,
 
   /** Show the "Delete all chats" button in the sidebar */
   showDeleteAllChats: false,
