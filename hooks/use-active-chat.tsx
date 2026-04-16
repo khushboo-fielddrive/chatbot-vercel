@@ -3,7 +3,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   type Dispatch,
@@ -61,6 +61,7 @@ function extractChatId(pathname: string): string | null {
 export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const { ready: eventAuthReady } = useEventToken();
   const pathname = usePathname();
+  const router = useRouter();
   const { setDataStream } = useDataStream();
   const { mutate } = useSWRConfig();
 
@@ -68,11 +69,34 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const isNewChat = !chatIdFromUrl;
   const newChatIdRef = useRef(generateUUID());
   const prevPathnameRef = useRef(pathname);
+  const hasTriedResumeRef = useRef(false);
 
   if (isNewChat && prevPathnameRef.current !== pathname) {
     newChatIdRef.current = generateUUID();
   }
   prevPathnameRef.current = pathname;
+
+  // On first load (not "New Chat" click), redirect to most recent event chat
+  useEffect(() => {
+    if (hasTriedResumeRef.current || !isNewChat || !eventAuthReady) return;
+    hasTriedResumeRef.current = true;
+
+    const headers = getEventAuthHeaders();
+    if (!headers) return;
+
+    fetch(
+      `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?limit=1`,
+      { headers },
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        const recentChat = data?.chats?.[0];
+        if (recentChat?.id) {
+          router.replace(`/chat/${recentChat.id}`);
+        }
+      })
+      .catch(() => {});
+  }, [eventAuthReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chatId = chatIdFromUrl ?? newChatIdRef.current;
 
