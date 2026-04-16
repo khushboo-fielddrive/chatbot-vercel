@@ -53,15 +53,19 @@ const PurePreviewMessage = ({
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
-  const hasAnyContent = message.parts?.some(
+  const hasTextContent = message.parts?.some(
     (part) =>
       (part.type === "text" && part.text?.trim().length > 0) ||
       (part.type === "reasoning" &&
         "text" in part &&
-        part.text?.trim().length > 0) ||
-      part.type.startsWith("tool-")
+        part.text?.trim().length > 0)
   );
-  const isThinking = isAssistant && isLoading && !hasAnyContent;
+  const hasToolParts = message.parts?.some((part) =>
+    part.type.startsWith("tool-")
+  );
+
+  const isThinking = isAssistant && isLoading && !hasTextContent && !hasToolParts;
+  const isToolWorking = isAssistant && isLoading && !hasTextContent && hasToolParts;
 
   const attachments = attachmentsFromMessage.length > 0 && (
     <div
@@ -325,6 +329,16 @@ const PurePreviewMessage = ({
     <>
       {attachments}
       {parts}
+      <div
+        className={cn(
+          "flex h-[calc(13px*1.65)] items-center text-[13px] leading-[1.65]",
+          isToolWorking ? "opacity-100" : "hidden"
+        )}
+      >
+        <Shimmer className="font-medium" duration={1}>
+          Working on it...
+        </Shimmer>
+      </div>
       {actions}
     </>
   );
