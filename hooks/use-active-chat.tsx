@@ -70,6 +70,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const newChatIdRef = useRef(generateUUID());
   const prevPathnameRef = useRef(pathname);
   const hasTriedResumeRef = useRef(false);
+  const [resuming, setResuming] = useState(false);
 
   if (isNewChat && prevPathnameRef.current !== pathname) {
     newChatIdRef.current = generateUUID();
@@ -84,18 +85,21 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     const headers = getEventAuthHeaders();
     if (!headers) return;
 
+    setResuming(true);
     fetch(
       `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?limit=1`,
-      { headers },
+      { headers, signal: AbortSignal.timeout(3000) },
     )
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const recentChat = data?.chats?.[0];
         if (recentChat?.id) {
           router.replace(`/chat/${recentChat.id}`);
+        } else {
+          setResuming(false);
         }
       })
-      .catch(() => {});
+      .catch(() => setResuming(false));
   }, [eventAuthReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chatId = chatIdFromUrl ?? newChatIdRef.current;
@@ -316,6 +320,10 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       eventAuthReady,
     ]
   );
+
+  if (resuming) {
+    return <div className="flex h-dvh items-center justify-center" />;
+  }
 
   return (
     <ActiveChatContext.Provider value={value}>
