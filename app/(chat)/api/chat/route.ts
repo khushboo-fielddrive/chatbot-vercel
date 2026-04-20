@@ -34,7 +34,6 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
-  getMostRecentChatByUserAndEvent,
   saveChat,
   saveMessages,
   updateChatTitleById,
@@ -75,8 +74,7 @@ export async function POST(request: Request) {
 
 
   try {
-    let { id } = requestBody;
-    const { message, messages, selectedChatModel, selectedVisibilityType } =
+    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
       requestBody;
 
     const [, resolved] = await Promise.all([
@@ -109,26 +107,14 @@ export async function POST(request: Request) {
 
     const isToolApprovalFlow = Boolean(messages);
 
-    let chatRecord = await getChatById({ id });
+    const chatRecord = await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
-
-    // For event chats: resume the most recent chat if the client sends a new UUID
-    if (!chatRecord && validatedEventContext && message?.role === "user") {
-      const existing = await getMostRecentChatByUserAndEvent({
-        userId: effectiveUserId,
-        eventId: String(validatedEventContext.eventId),
-      });
-      if (existing) {
-        chatRecord = existing;
-      }
-    }
 
     if (chatRecord) {
       if (chatRecord.userId !== effectiveUserId) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
-      id = chatRecord.id;
       messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
       await saveChat({
