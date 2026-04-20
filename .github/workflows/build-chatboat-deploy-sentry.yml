@@ -58,15 +58,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
-          path: ${{ inputs.pwd }}/dist
+          path: ${{ inputs.pwd }}
 
       - name: Check contents of dist
         run: |
           du -sh dist || echo "dist is empty"
-          rm dist/ecosystem.config.js
           rm dist/package.json
-          rm dist/package-lock.json
-          rm dist/Dockerfile
+          rm dist/pnpm-lock.yaml 
+          rm dist/Dockerfile 
           ls -al .
         working-directory: ${{ inputs.pwd }}
           

@@ -87,18 +87,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
-          path: ${{ inputs.pwd }}/dist
+          path: ${{ inputs.pwd }}
 
       - name: Check contents of dist
         run: |
           du -sh dist || echo "dist is empty"
           mv dist/package.json ./
-          mv dist/ecosystem.config.js ./
-          mv dist/package-lock.json ./ 
+          mv dist/pnpm-lock.yaml ./
           mv dist/Dockerfile ./
-          npm install
+          mv dist/public ./public
+          mv dist/standalone ./standalone
+          mv dist/static ./static
+          rm -rf dist
+          pnpm install --frozen-lockfile
           ls -al .
-          ls -al ./dist
         working-directory: ${{ inputs.pwd }}
           
       - name: Set environment-specific variables

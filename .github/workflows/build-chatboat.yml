@@ -41,12 +41,16 @@ jobs:
 
       - name: NodeJs build
         run: |
-          npm install
-          npm run build
-          cp ecosystem.config.js dist/
+          sudo mkdir -p ${{ inputs.pwd }}/dist
+          sudo chmod -R 777 ${{ inputs.pwd }}/dist
+          pnpm install --frozen-lockfile
+          pnpm build
           cp package.json dist/
-          cp package-lock.json dist/
+          cp pnpm-lock.yaml dist/
           cp Dockerfile dist/
+          cp public dist/public
+          cp .next/standalone dist/standalone
+          cp .next/static dist/static
           du -sh *
         working-directory: ${{ inputs.pwd }}
 
@@ -75,5 +79,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
-          path: ${{ inputs.pwd }}/dist
+          path: ${{ inputs.pwd }}
           if-no-files-found: error
