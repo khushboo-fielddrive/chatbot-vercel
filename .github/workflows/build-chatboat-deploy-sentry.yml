@@ -1,0 +1,102 @@
+name: Build and deploy analytics-chatboat-be sentry
+
+on:
+  workflow_call:
+    inputs: 
+      repository:
+        description: "Working git repository"
+        required: true
+        type: string
+      pwd:
+        description: "Working directory"
+        required: true
+        type: string
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: string
+    secrets:
+      workflow_arn:
+        required: true
+  workflow_dispatch:
+
+jobs:
+  sentry-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment-specific variables
+        run: |
+          echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Sanitize branch name
+        run: |
+          SANITIZED_BRANCH_NAME="${BRANCH_NAME//\//_}"
+          echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Create work-directory
+        run: |
+          echo "Creating Directory: ${{ inputs.pwd }}"
+          sudo mkdir -p ${{ inputs.pwd }}
+          sudo chmod -R 777 ${{ inputs.pwd }}
+          sudo mkdir -p ${{ inputs.pwd }}/dist
+          sudo chmod -R 777 ${{ inputs.pwd }}/dist
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ github.ref_name }}
+          path: ${{ inputs.pwd }}
+
+      - name: Download Build Number Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build-number
+          path: ${{ inputs.pwd }}
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
+          path: ${{ inputs.pwd }}/dist
+
+      - name: Check contents of dist
+        run: |
+          du -sh dist || echo "dist is empty"
+          rm dist/ecosystem.config.js
+          rm dist/package.json
+          rm dist/package-lock.json
+          rm dist/Dockerfile
+          ls -al .
+        working-directory: ${{ inputs.pwd }}
+          
+      - name: Set environment-specific variables
+        run: |
+          BUILD_NUMBER=$(cat ${{ inputs.pwd }}_${{ env.SANITIZED_BRANCH_NAME }}_build_number.txt | awk -F'=' '{print $2}')
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "BUILD_NUMBER: $BUILD_NUMBER"
+        working-directory: ${{ inputs.pwd }}
+
+      - name: Sentry build and deploy
+        run: |
+          export SENTRY_LOG_LEVEL=info
+          export SENTRY_AUTH_TOKEN='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'
+          export SENTRY_ORG='fielddrive-r0'
+          export SENTRY_PROJECT='analytics-chatboat-be'
+          export SENTRY_ENVIRONMENT=${{ inputs.environment }}
+          ls -ltr
+
+          command -v sentry-cli || curl -sL https://sentry.io/get-cli/ | bash
+          echo "Uploading sourcemap for build $BUILD_NUMBER on sentry project $SENTRY_PROJECT [$SENTRY_ENVIRONMENT]"
+          sentry-cli releases new -p $SENTRY_PROJECT $BUILD_NUMBER
+          sentry-cli releases set-commits $BUILD_NUMBER --auto --ignore-missing                 
+          sentry-cli sourcemaps inject --org $SENTRY_ORG --release $BUILD_NUMBER dist
+          sentry-cli sourcemaps upload --org $SENTRY_ORG --release $BUILD_NUMBER dist
+          echo "Finalising sentry build $BUILD_NUMBER on sentry project $SENTRY_PROJECT [$SENTRY_ENVIRONMENT]"
+          sentry-cli releases finalize $BUILD_NUMBER
+          sentry-cli deploys new --release $BUILD_NUMBER -e $SENTRY_ENVIRONMENT --name "$SENTRY_ENVIRONMENT build #$BUILD_NUMBER"
+        working-directory: ${{ inputs.pwd }}
+              
+              
+
+
