@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import PostHogClientProvider from "@/components/posthog-provider";
 
 import "./globals.css";
 
@@ -68,7 +69,9 @@ export default function RootLayout({
           disableTransitionOnChange
           enableSystem
         >
+          <PostHogClientProvider>
             <TooltipProvider>{children}</TooltipProvider>
+          </PostHogClientProvider>
         </ThemeProvider>
       </body>
     </html>
