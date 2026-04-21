@@ -11,6 +11,10 @@ on:
         description: "Working directory"
         required: true
         type: string
+      environment:
+        description: "Build environment (devthree, production, prod2)"
+        required: true
+        type: string
     secrets:
       workflow_arn:
         required: true
@@ -55,7 +59,7 @@ jobs:
         run: |
           mkdir -p dist
           pnpm install --frozen-lockfile
-          pnpm build
+          pnpm build:${{ inputs.environment }}
           cp package.json dist/
           cp pnpm-lock.yaml dist/
           cp Dockerfile dist/
