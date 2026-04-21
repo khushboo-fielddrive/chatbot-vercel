@@ -33,24 +33,35 @@ jobs:
         run: mkdir -p ${{ inputs.pwd }}
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ github.ref_name }}
           path: ${{ inputs.pwd }}
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: ${{ inputs.pwd }}/pnpm-lock.yaml
 
       - name: NodeJs build
         run: |
-          sudo mkdir -p ${{ inputs.pwd }}/dist
-          sudo chmod -R 777 ${{ inputs.pwd }}/dist
+          mkdir -p dist
           pnpm install --frozen-lockfile
           pnpm build
           cp package.json dist/
           cp pnpm-lock.yaml dist/
           cp Dockerfile dist/
-          cp public dist/public
-          cp .next/standalone dist/standalone
-          cp .next/static dist/static
+          cp -r public dist/public
+          cp -r .next/standalone dist/standalone
+          cp -r .next/static dist/static
           du -sh *
         working-directory: ${{ inputs.pwd }}
 
@@ -79,5 +90,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
-          path: ${{ inputs.pwd }}
+          path: ${{ inputs.pwd }}/dist
           if-no-files-found: error

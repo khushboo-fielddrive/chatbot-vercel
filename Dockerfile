@@ -9,13 +9,13 @@ WORKDIR /app
 
 # Stage 2: Install dependencies
 COPY package.json pnpm-lock.yaml node_modules public ./
-RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build the Next.js app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 COPY --chown=nextjs:nodejs standalone ./
 COPY --chown=nextjs:nodejs static ./.next/static
+RUN pnpm install --frozen-lockfile
 
 # Stage 4: Production runner
 ENV NODE_ENV=production

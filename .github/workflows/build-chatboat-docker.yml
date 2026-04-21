@@ -99,7 +99,6 @@ jobs:
           mv dist/standalone ./standalone
           mv dist/static ./static
           rm -rf dist
-          pnpm install --frozen-lockfile
           ls -al .
         working-directory: ${{ inputs.pwd }}
           
