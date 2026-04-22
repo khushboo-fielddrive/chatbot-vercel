@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { EventContext } from "@/lib/ai/event-context";
 import { createAccountTools } from "./account";
+import { createAccountInsightTools } from "./account-insights";
 import { createAttendeeTools } from "./attendees";
 import { createCategoryTools } from "./categories";
 import { createCheckHistoryTools } from "./check-history";
@@ -18,6 +19,7 @@ export function createEventTools(ctx: EventContext) {
       execute: async () => event,
     }),
     ...createAccountTools(accountId),
+    ...createAccountInsightTools(accountId, eventId),
     ...createAttendeeTools(eventId),
     ...createCategoryTools(eventId),
     ...createCheckHistoryTools(eventId),
