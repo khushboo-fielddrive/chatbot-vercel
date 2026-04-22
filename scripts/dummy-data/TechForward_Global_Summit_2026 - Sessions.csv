@@ -1,0 +1,19 @@
+Session Third Party Id,Name,Start,End,Session Location,Capacity limit,Allow OUT-scanning,Allow force check-in,Default Session Access Amount,Number of scans per session
+EntranceD1,Day 1 Registration & Entry,28-Apr-2026 08:00,28-Apr-2026 18:00,"Main Entrance, Level 1",,FALSE,FALSE,Infinite,320
+EntranceD2,Day 2 Registration & Entry,29-Apr-2026 08:00,29-Apr-2026 18:00,"Main Entrance, Level 1",,FALSE,FALSE,Infinite,178
+EntranceD3,Day 3 Registration & Entry,30-Apr-2026 08:00,30-Apr-2026 18:00,"Main Entrance, Level 1",,FALSE,FALSE,Infinite,76
+EntranceD4,Day 4 Registration & Entry,01-May-2026 08:30,01-May-2026 13:00,"Main Entrance, Level 1",,FALSE,FALSE,Infinite,56
+S01_OpenKeynote,Opening Keynote: The AI-Native Enterprise,28-Apr-2026 09:00,28-Apr-2026 09:50,Main Auditorium,,FALSE,TRUE,Infinite,65
+S02_GenAI,Generative AI in Production: Scaling LLMs for the Enterprise,28-Apr-2026 10:30,28-Apr-2026 12:00,Hall A — Congress Level,,TRUE,TRUE,Infinite,78
+S03_CloudNative,Cloud-Native & Platform Engineering at Scale,28-Apr-2026 10:30,28-Apr-2026 12:00,Hall B — Congress Level,,TRUE,TRUE,Infinite,55
+S04_Reception,Welcome Networking Reception,28-Apr-2026 19:00,28-Apr-2026 21:00,"Grand Ballroom, Level 4",,FALSE,FALSE,Infinite,88
+S05_Cybersecurity,Zero Trust & Modern Threat Intelligence,29-Apr-2026 09:00,29-Apr-2026 10:30,Hall A — Congress Level,,TRUE,TRUE,Infinite,45
+S06_DevEx,Developer Experience: From Inner Loop to Production,29-Apr-2026 09:15,29-Apr-2026 10:45,Hall B — Congress Level,,TRUE,TRUE,Infinite,52
+S07_Startup,Startup Showcase & VC Panel: Who Is Funding What,29-Apr-2026 11:00,29-Apr-2026 12:30,Hall A — Congress Level,,TRUE,TRUE,Infinite,48
+S08_DataInfra,"Modern Data Infrastructure: Lakehouses, Streaming & Governance",29-Apr-2026 11:00,29-Apr-2026 12:30,Hall B — Congress Level,,TRUE,TRUE,Infinite,62
+S09_VIPRoundtable,VIP & Investor Roundtable: The Next Decade of Tech,29-Apr-2026 14:00,29-Apr-2026 16:00,"Executive Suite, Level 3",25,FALSE,TRUE,0,9
+S10_HardwareAI,AI Hardware & Semiconductor Innovation: Beyond the GPU,29-Apr-2026 14:00,29-Apr-2026 15:30,Hall A — Congress Level,,TRUE,TRUE,Infinite,40
+S11_FutureWork,"Future of Work: AI Agents, Automation & Human-Computer Interaction",30-Apr-2026 09:30,30-Apr-2026 11:00,Hall A — Congress Level,,TRUE,TRUE,Infinite,55
+S13_OpenSource,"Open Source, API Ecosystems & Platform Economics",30-Apr-2026 11:00,30-Apr-2026 12:30,Hall A — Congress Level,,TRUE,TRUE,Infinite,60
+S14_Quantum,Quantum Computing & Next-Gen Computing: Practical Horizons,30-Apr-2026 11:00,30-Apr-2026 12:30,Hall B — Congress Level,,TRUE,TRUE,Infinite,35
+S12_ClosingKeynote,Closing Keynote: Tech's Responsibility & The Road to 2030,01-May-2026 11:30,01-May-2026 12:30,Main Auditorium,,FALSE,TRUE,Infinite,68

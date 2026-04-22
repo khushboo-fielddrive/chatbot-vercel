@@ -88,7 +88,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     setResuming(true);
     fetch(
       `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?limit=1`,
-      { headers, signal: AbortSignal.timeout(3000) },
+      { headers, signal: AbortSignal.timeout(5000) },
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {

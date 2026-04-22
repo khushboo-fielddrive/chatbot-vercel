@@ -44,7 +44,7 @@ import {
   type ModelCapabilities,
 } from "@/lib/ai/models";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, getEventAuthHeaders } from "@/lib/utils";
 import {
   PromptInput,
   PromptInputFooter,
@@ -267,6 +267,7 @@ function PureMultimodalInput({
         {
           method: "POST",
           body: formData,
+          headers: getEventAuthHeaders(),
         }
       );
 

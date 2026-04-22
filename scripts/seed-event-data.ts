@@ -10,11 +10,11 @@
 
 // ============ CONFIGURATION — Edit these before running ============
 const BASE_URL = "https://api-fdb.devthree.fielddrivedev.com/rest";
-const EVENT_ID = 6163;
+const EVENT_ID = 6183;
 const API_KEY = ""; //fd-API-key
 const ATTENDEE_COUNT = 750;
 const SESSION_COUNT = 10;
-const EVENT_START_DATE = "2026-04-30"; // YYYY-MM-DD (event spans 2 days)
+const EVENT_START_DATE = "2026-04-24"; // YYYY-MM-DD (event spans 2 days)
 const ID_PREFIX = "TP"; // prefix for attendee thirdPartyIds
 const CHECKIN_PERCENT = 0.6; // 60% of confirmed attendees get event check-in
 const SESSION_CHECKIN_PERCENT = 0.5; // 50% of reserved+checked-in attendees get session check-in
@@ -201,6 +201,11 @@ function slugify(company: string): string {
     .slice(0, 12);
 }
 
+/** Slugify a category name into a thirdPartyId-safe string. e.g. "General Attendee" → "General_Attendee" */
+function slugifyCategory(name: string): string {
+  return name.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
 function generateEmail(
   firstName: string,
   lastName: string,
@@ -374,7 +379,7 @@ function generateAttendees(sessions: SessionData[]): AttendeeData[] {
       country: country.name,
       workPhone: randomPhone(country.code),
       badgeNum: padId("BAR", i),
-      categoryThirdPartyId: category.name,
+      categoryThirdPartyId: slugifyCategory(category.name),
       fieldValues: {
         LunchOpted: Math.random() < 0.7 ? "TRUE" : "FALSE",
       },
@@ -430,6 +435,20 @@ async function fetchWithRetry(
     }
   }
   return { ok: false, status: 0, body: "Max retries exceeded" };
+}
+
+async function upsertAttendeeCategory(thirdPartyId: string, name: string): Promise<boolean> {
+  const url = `${BASE_URL}/api/v1/integration/events/${EVENT_ID}/attendeeCategories/upsert?apiKey=${API_KEY}`;
+  const result = await fetchWithRetry(
+    url,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thirdPartyId, name }),
+    },
+    `Category ${thirdPartyId} (${name})`,
+  );
+  return result.ok;
 }
 
 async function upsertSession(
@@ -634,6 +653,19 @@ async function main() {
   for (const a of attendees) {
     emailToAttendee.set(a.emailAddress, a);
   }
+
+  // --- Phase 0: Upsert Categories ---
+  console.log("\n--- Phase 0: Upserting attendee categories ---");
+  let categorySuccess = 0;
+  for (const cat of CATEGORIES) {
+    const tpid = slugifyCategory(cat.name);
+    const ok = await upsertAttendeeCategory(tpid, cat.name);
+    if (ok) {
+      categorySuccess++;
+      console.log(`  [OK] ${tpid} → ${cat.name}`);
+    }
+  }
+  console.log(`  Categories: ${categorySuccess}/${CATEGORIES.length} succeeded`);
 
   // --- Phase 1: Upsert Sessions ---
   console.log("\n--- Phase 1: Upserting sessions ---");
