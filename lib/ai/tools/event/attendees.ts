@@ -49,11 +49,14 @@ export function createAttendeeTools(eventId: number) {
       execute: async ({ attendee_id }) => {
         const [attendeeRows, fieldRows] = await Promise.all([
           fetchAll(
-            `SELECT id, name, email, barcode, registrationStatus, approvalStatus,
-                    checkinAt, totalCost, balanceDue, category_id, subcategory_id,
-                    discountCode, personalNote, location, operator
-             FROM Attendee
-             WHERE id = ? AND event_id = ? AND deleted = 0`,
+            `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus,
+                    a.checkinAt, a.totalCost, a.balanceDue, a.category_id, ac.name AS category,
+                    a.subcategory_id, asc2.name AS subcategory,
+                    a.discountCode, a.personalNote, a.location, a.operator
+             FROM Attendee a
+             LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+             LEFT JOIN AttendeeCategory asc2 ON asc2.id = a.subcategory_id
+             WHERE a.id = ? AND a.event_id = ? AND a.deleted = 0`,
             [attendee_id, eventId],
           ),
           fetchAll(
