@@ -1,36 +1,27 @@
-# Stage 1: Base image with Node.js and pnpm
-FROM node:22-alpine AS base
+# This Dockerfile sets up a Node.js application.
+# It installs dependencies, builds the application, and runs it in production mode.
+# Use this Dockerfile to create a Docker image for your Node.js application.
+# Make sure to uncomment the migration and seed commands if needed.
+# Use the command `docker build -t your-image-name .` to build the image.       
+FROM node:22-alpine 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 WORKDIR /app
 
 # Stage 2: Install dependencies
-FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml node_modules public ./
 
 # Stage 3: Build the Next.js app
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN pnpm build
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+COPY --chown=nextjs:nodejs standalone ./
+COPY --chown=nextjs:nodejs static ./.next/static
+RUN pnpm install --frozen-lockfile
 
 # Stage 4: Production runner
-FROM node:22-alpine AS runner
-WORKDIR /app
-
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
 USER nextjs
-
 EXPOSE 3000
-
 CMD ["node", "server.js"]

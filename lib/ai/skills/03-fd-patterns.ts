@@ -1,4 +1,65 @@
-const content = `## Tool Usage Patterns
+const content = `## Intent Routing
+
+Match the user's message here first — then jump directly to the pattern or tool below. Skip this step only if the intent is ambiguous.
+
+| User says… | Action |
+|---|---|
+| "how's the event" / "overview" / "status" / "summary" | → \`get_event_overview()\` |
+| "hasn't checked in" / "not arrived" / "pending" / "missing" | → \`list_not_checked_in_attendees()\` |
+| "has [name] checked in" / "did [name] arrive" | → \`check_attendee_status(q=name)\` |
+| "breakdown by [X]" / "how many from each [X]" / "distribution of [X]" | → Pattern: **Custom field distribution** |
+| "by category" / "category breakdown" | → \`get_category_breakdown()\` |
+| "by status" / "registration status" | → \`get_registration_status_breakdown()\` |
+| "trend" / "over time" / "timeline" / "per hour" / "arrivals" | → Pattern: **Check-in timeline** |
+| "how fast" / "current rate" / "slowing down" / "speeding up" / "right now" | → Pattern: **Check-in velocity** |
+| "session" + "capacity" / "full" / "fill" / "how many seats" | → \`get_session_attendance_stats()\` |
+| "who is in session [X]" / "attendees in session" | → Pattern: **Session attendees** |
+| "tell me everything about [name]" / "full profile" | → Pattern: **Full profile** |
+| "check-in history" / "audit log" for [name] | → Pattern: **Check-in history** |
+| "what sessions" / "list sessions" | → \`list_event_sessions()\` |
+| "which account" / "what event is this" | → \`get_current_account()\` / \`get_current_event()\` |
+
+---
+
+## Tool Quick Reference
+
+Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
+
+| Tool | When to use |
+|---|---|
+| \`get_current_account\` | "Which account am I on?" |
+| \`get_current_event\` | "What event is this?" / "What are the event details?" |
+| \`list_attendees\` | Browse all attendees — returns \`registrationStatus\` + \`checkinAt\`, check both for check-in status |
+| \`search_attendees\` | Find an attendee by name, email, or barcode |
+| \`get_attendee_full_profile\` | Attendee core fields + all custom field values in one call — prefer over chaining separate calls |
+| \`get_attendee_check_history\` | Full audit log of check-in/out actions for one attendee |
+| \`list_attendees_with_custom_fields\` | All attendees with all custom fields — use when you need the full list with custom data |
+| \`list_attendee_categories\` | "What attendee categories exist?" |
+| \`list_attendee_fields\` | Discover custom fields and exact labels — always call before filtering by a custom field |
+| \`get_event_overview\` | "How's the event?" / "Give me an overview" / "Event status" — full snapshot in one call; set \`include_sessions=true\` only if sessions are part of the question |
+| \`get_checked_in_attendees\` | "How many have checked in?" — reflects \`checkinAt IS NOT NULL\` only |
+| \`list_not_checked_in_attendees\` | "Who hasn't checked in?" — direct query, always prefer over filtering \`list_attendees\` |
+| \`check_attendee_status\` | "Has [name/email/barcode] checked in?" — fast single lookup, returns \`has_checked_in\` bool |
+| \`get_attendees_by_custom_field\` | Filter attendees by a custom field value — use exact label from \`list_attendee_fields\` first |
+| \`get_custom_field_distribution\` | "How many attendees from each country?" — grouped count of a custom field |
+| \`get_category_breakdown\` | Attendee count broken down by category |
+| \`get_registration_status_breakdown\` | Attendee count broken down by registration status |
+| \`get_session_attendance_stats\` | Session fill rates and attendance across the event |
+| \`get_checkin_velocity\` | "How fast are people checking in?" / "Is check-in slowing down?" — real-time rate with trend direction |
+| \`get_checkin_timeline\` | Check-in trend over time — \`slot_mins=60\` for hourly, \`slot_mins=15\` for granular |
+| \`list_event_sessions\` | "What sessions does this event have?" |
+| \`get_session_attendees\` | All attendees for a specific session |
+| \`get_session_scans\` | Scan history for a specific session reservation |
+
+---
+
+## Tool Usage Patterns
+
+### "How's the event going?" / "Give me an overview" / "Event status"
+1. \`get_event_overview(include_sessions=false)\` — single call returns check-in summary, last-hour arrivals, category breakdown, and registration status
+2. Set \`include_sessions=true\` only if the user also asks about session performance in the same question
+
+---
 
 ### "How many attendees have checked in?"
 1. \`get_checked_in_attendees()\` — read \`summary.checked_in_count\` and \`summary.total_attendees\`
@@ -40,10 +101,18 @@ const content = `## Tool Usage Patterns
 1. \`list_event_sessions()\` — find session ID
 2. \`get_session_attendees(session_id=<id>)\`
 
+### "How fast are people checking in?" / "Is check-in slowing down?"
+1. \`get_checkin_velocity(window_mins=30)\` — default 30-minute window
+2. Use \`window_mins=15\` if the user says "right now" or "last 15 minutes"
+3. Use \`window_mins=60\` if the user says "last hour"
+4. The tool returns \`trend\` as "increasing" / "decreasing" / "steady" — report it directly, no arithmetic needed
+
+---
+
 ### "Show me the check-in trend / timeline"
-1. \`get_checkin_timeline(slot_mins=60)\` — hourly buckets by default
-2. Use \`slot_mins=15\` for 15-minute granularity if the user wants a more detailed view
-3. If the user asks to "chart" or "graph" the trend, render as an xychart-beta mermaid diagram (see Response Format)
+1. \`get_checkin_timeline(slot_mins=60)\` — always use 60 by default
+2. Use \`slot_mins=15\` only if the user says "detailed", "granular", "zoom in", or "last hour"
+3. Always render as xychart-beta mermaid automatically (see Response Format — no need to ask)
 
 ### "How are sessions performing across the event?"
 1. \`get_session_attendance_stats()\` — fill rates for all sessions in one call`;
