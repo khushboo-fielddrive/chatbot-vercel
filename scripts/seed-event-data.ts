@@ -10,11 +10,11 @@
 
 // ============ CONFIGURATION — Edit these before running ============
 const BASE_URL = "https://api-fdb.devthree.fielddrivedev.com/rest";
-const EVENT_ID = 6163;
+const EVENT_ID = 6183;
 const API_KEY = ""; //fd-API-key
 const ATTENDEE_COUNT = 750;
 const SESSION_COUNT = 10;
-const EVENT_START_DATE = "2026-04-30"; // YYYY-MM-DD (event spans 2 days)
+const EVENT_START_DATE = "2026-04-24"; // YYYY-MM-DD (event spans 2 days)
 const ID_PREFIX = "TP"; // prefix for attendee thirdPartyIds
 const CHECKIN_PERCENT = 0.6; // 60% of confirmed attendees get event check-in
 const SESSION_CHECKIN_PERCENT = 0.5; // 50% of reserved+checked-in attendees get session check-in

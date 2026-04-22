@@ -172,6 +172,7 @@ function buildSessions(rows: Record<string, string>[], restrictedSessionIds: Set
     return {
       thirdPartyId: tpid,
       name: r["Name"],
+      location: r["Session Location"],
       startsOn: parseFielddriveDate(r["Start"]),
       endsOn: parseFielddriveDate(r["End"]),
       ...(capacity !== undefined && !Number.isNaN(capacity) ? { capacity } : {}),
@@ -420,7 +421,7 @@ async function checkInAttendeeSession(
   checkInDate: string,
   scanData: { operator: string; location: string; kioskId: string; kioskName: string; checkinMode: string },
 ): Promise<boolean> {
-  const url = `${BASE_URL}/api/v1/events/${EVENT_ID}/sessions/78310/attendants/${internalAttendeeId}/checkin?checkInDate=${encodeURIComponent(checkInDate)}&apiKey=${API_KEY}`;
+  const url = `${BASE_URL}/api/v1/events/${EVENT_ID}/sessions/${internalSessionId}/attendants/${internalAttendeeId}/checkin?checkInDate=${encodeURIComponent(checkInDate)}&apiKey=${API_KEY}`;
   const result = await fetchWithRetry(
     url,
     {
@@ -532,6 +533,19 @@ async function main() {
     categoryTpidMap.set(name, slugifyCategory(name));
   }
 
+  // Merge session check-in events into reservationsMap so every session scan has a backing reservation.
+  // The API rejects session check-ins without an existing reservation.
+  const explicitReservationCount = Array.from(reservationsMap.values()).reduce((s, arr) => s + arr.length, 0);
+  let addedFromLog = 0;
+  for (const ev of sessionCheckInEvents) {
+    if (!ev.attendeeTpid || !ev.sessionTpid) continue;
+    const existing = reservationsMap.get(ev.attendeeTpid) ?? [];
+    if (existing.some((r) => r.sessionThirdPartyId === ev.sessionTpid)) continue;
+    existing.push({ sessionThirdPartyId: ev.sessionTpid, accessAmount: "1" });
+    reservationsMap.set(ev.attendeeTpid, existing);
+    addedFromLog++;
+  }
+
   const attendees = buildAttendees(attendeeRows, reservationsMap, categoryTpidMap);
 
   const totalReservations = attendees.reduce((sum, a) => sum + a.sessionReservations.length, 0);
@@ -539,6 +553,7 @@ async function main() {
   console.log(`  ${sessions.length} sessions (${restrictedSessionIds.size} restricted, ${sessions.length - restrictedSessionIds.size} open)`);
   console.log(`  ${categoryTpidMap.size} unique categories`);
   console.log(`  ${attendees.length} attendees with ${totalReservations} embedded reservations`);
+  console.log(`    (${explicitReservationCount} from reservations CSV + ${addedFromLog} auto-added from session check-in events)`);
   console.log(`  Event log breakdown (of ${eventLogRows.length} total):`);
   console.log(`    ${eventCheckInEvents.length} Check-In (event check-ins)`);
   console.log(`    ${sessionCheckInEvents.length} Session Scan (session check-ins)`);
