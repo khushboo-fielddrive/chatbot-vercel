@@ -217,7 +217,7 @@ export async function POST(request: Request) {
             ? eventSystemPrompt({ requestHints, supportsTools, ctx: validatedEventContext })
             : systemPrompt({ requestHints, supportsTools }),
           messages: modelMessages,
-          stopWhen: stepCountIs(5),
+          stopWhen: stepCountIs(100),
           experimental_activeTools:
             isReasoningModel && !supportsTools
               ? []

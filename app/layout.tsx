@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import PostHogClientProvider from "@/components/posthog-provider";
@@ -16,11 +16,16 @@ export const viewport = {
   maximumScale: 1,
 };
 
-const poppins = Poppins({
+const geist = Geist({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "700"],
-  variable: "--font-poppins",
+  variable: "--font-geist",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-geist-mono",
 });
 
 const LIGHT_THEME_COLOR = "hsl(0 0% 100%)";
@@ -50,7 +55,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${poppins.variable}`}
+      className={`${geist.variable} ${geistMono.variable}`}
       lang="en"
       suppressHydrationWarning
     >
