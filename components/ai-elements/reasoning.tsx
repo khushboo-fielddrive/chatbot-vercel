@@ -204,7 +204,7 @@ export type ReasoningContentProps = HTMLAttributes<HTMLDivElement> & {
 const mermaid = createMermaidPlugin({
   config: {
     theme: "base",
-    fontFamily: "var(--font-poppins), Poppins, sans-serif",
+    fontFamily: "var(--font-geist), Geist, sans-serif",
     themeVariables: {
       primaryColor: "#4f46e5",
       primaryTextColor: "#ffffff",
