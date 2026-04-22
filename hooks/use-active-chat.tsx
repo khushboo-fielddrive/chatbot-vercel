@@ -3,7 +3,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   type Dispatch,
@@ -61,7 +61,6 @@ function extractChatId(pathname: string): string | null {
 export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const { ready: eventAuthReady } = useEventToken();
   const pathname = usePathname();
-  const router = useRouter();
   const { setDataStream } = useDataStream();
   const { mutate } = useSWRConfig();
 
@@ -69,38 +68,11 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const isNewChat = !chatIdFromUrl;
   const newChatIdRef = useRef(generateUUID());
   const prevPathnameRef = useRef(pathname);
-  const hasTriedResumeRef = useRef(false);
-  const [resuming, setResuming] = useState(false);
 
   if (isNewChat && prevPathnameRef.current !== pathname) {
     newChatIdRef.current = generateUUID();
   }
   prevPathnameRef.current = pathname;
-
-  // On first load (not "New Chat" click), redirect to most recent event chat
-  useEffect(() => {
-    if (hasTriedResumeRef.current || !isNewChat || !eventAuthReady) return;
-    hasTriedResumeRef.current = true;
-
-    const headers = getEventAuthHeaders();
-    if (!headers) return;
-
-    setResuming(true);
-    fetch(
-      `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?limit=1`,
-      { headers, signal: AbortSignal.timeout(5000) },
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const recentChat = data?.chats?.[0];
-        if (recentChat?.id) {
-          router.replace(`/chat/${recentChat.id}`);
-        } else {
-          setResuming(false);
-        }
-      })
-      .catch(() => setResuming(false));
-  }, [eventAuthReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chatId = chatIdFromUrl ?? newChatIdRef.current;
 
@@ -320,10 +292,6 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       eventAuthReady,
     ]
   );
-
-  if (resuming) {
-    return <div className="flex h-dvh items-center justify-center" />;
-  }
 
   return (
     <ActiveChatContext.Provider value={value}>
