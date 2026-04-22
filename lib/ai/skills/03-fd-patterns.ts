@@ -18,6 +18,10 @@ Match the user's message here first — then jump directly to the pattern or too
 | "check-in history" / "audit log" for [name] | → Pattern: **Check-in history** |
 | "what sessions" / "list sessions" | → \`list_event_sessions()\` |
 | "which account" / "what event is this" | → \`get_current_account()\` / \`get_current_event()\` |
+| "compare events" / "vs last event" / "how did X compare" | → Pattern: **Compare events** |
+| "likely to attend" / "will they come back" / "return likelihood" | → \`get_attendee_return_likelihood()\` |
+| "all events" / "list events" / "past events" / "event history" | → \`list_account_events()\` |
+| "trend across events" / "attendance over time" / "across all events" | → \`get_account_event_trends()\` |
 
 ---
 
@@ -50,6 +54,14 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 | \`list_event_sessions\` | "What sessions does this event have?" |
 | \`get_session_attendees\` | All attendees for a specific session |
 | \`get_session_scans\` | Scan history for a specific session reservation |
+
+### Account Analytics
+| Tool | When to use |
+|---|---|
+| \`list_account_events\` | Search account events by base name (e.g. "Tech Summit") — always strip year from current event name and pass as \`q\`. Call before \`compare_events\` to find matching event IDs |
+| \`compare_events\` | Side-by-side metrics for 2–5 events — requires event IDs from \`list_account_events\` |
+| \`get_account_event_trends\` | Attendance trend across all account events — use for growth/decline analysis |
+| \`get_attendee_return_likelihood\` | "Is [name] likely to attend?" — checks historical attendance rate across past events |
 
 ---
 
@@ -115,6 +127,26 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 3. Always render as xychart-beta mermaid automatically (see Response Format — no need to ask)
 
 ### "How are sessions performing across the event?"
-1. \`get_session_attendance_stats()\` — fill rates for all sessions in one call`;
+1. \`get_session_attendance_stats()\` — fill rates for all sessions in one call
+
+---
+
+### "Compare this event with [other event]" / "How did X vs Y perform?"
+1. Extract the base name from the current event — strip trailing year/number/edition (e.g. "Tech Summit 2026" → "Tech Summit", "Annual Conf 3rd Edition" → "Annual Conf")
+2. \`list_account_events(q=<base name>)\` — returns all events matching that name across all years
+3. Exclude the current event from the returned list
+4. If **no matches** → respond: "No previous events found with a similar name on this account."
+5. If **1 or more matches** → \`compare_events(event_ids=[current_event_id, ...all_matched_ids])\` — do not ask the user, proceed directly
+6. Present results using the comparison format (see Response Format) — always include event names + IDs
+
+### "Is [name] likely to attend?" / "Will they come back?"
+1. \`get_attendee_return_likelihood(name_or_email=<name or email>)\`
+2. Report the \`likelihood\` field directly: "likely" / "uncertain" / "unlikely" / "first_time"
+3. Include \`events_registered\`, \`events_attended\`, and \`attendance_rate\` for context
+4. If multiple matches are returned, list each with their individual likelihood
+
+### "Show attendance trend across all events" / "How has attendance changed over time?"
+1. \`get_account_event_trends()\` — returns all events with metrics ordered by date
+2. Render as \`xychart-beta\` automatically (trend data — same rule as check-in timeline)`;
 
 export default content;

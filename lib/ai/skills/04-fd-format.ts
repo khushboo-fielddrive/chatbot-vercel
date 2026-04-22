@@ -60,6 +60,15 @@ xychart-beta
     bar [12, 34, 28, 15]
 \`\`\`
 
+**Event comparison:**
+Always show event name + ID for every event compared. Never show IDs alone.
+> Comparing **Tech Summit 2025** (ID: 101) vs **Tech Summit 2022** (ID: 87)
+>
+> | Metric | Tech Summit 2025 | Tech Summit 2022 |
+> |---|---|---|
+> | Total Attendees | 500 | 420 |
+> | Checked In | 312 (62.4%) | 280 (66.7%) |
+
 **Session capacity:**
 > "Workshop A" has 32 of 50 seats filled. 18 spots remain.
 
