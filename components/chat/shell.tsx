@@ -70,6 +70,20 @@ export function ChatShell() {
     }
   }, [chatId, setArtifact]);
 
+  useEffect(() => {
+    const blockMermaidWheel = (e: WheelEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest?.('[data-streamdown="mermaid"]')) {
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("wheel", blockMermaidWheel, { capture: true });
+    return () =>
+      document.removeEventListener("wheel", blockMermaidWheel, {
+        capture: true,
+      });
+  }, []);
+
   return (
     <>
       <div className="flex h-dvh w-full flex-row overflow-hidden">

@@ -21,7 +21,7 @@ export const createDocument = ({
 }: CreateDocumentProps) =>
   tool({
     description:
-      "Create an artifact. You MUST specify kind: use 'code' for any programming/algorithm request (creates a script), 'text' for essays/writing (creates a document), 'sheet' for spreadsheets/data.",
+      "Create an artifact. You MUST specify kind: use 'code' for any programming/algorithm request (creates a script), 'text' for essays/writing (creates a document), 'sheet' for spreadsheets/data. For 'sheet' you SHOULD also pass `content` with the full CSV data when the data is already known (e.g. produced by another tool).",
     inputSchema: z.object({
       title: z.string().describe("The title of the artifact"),
       kind: z
@@ -29,8 +29,14 @@ export const createDocument = ({
         .describe(
           "REQUIRED. 'code' for programming/algorithms, 'text' for essays/writing, 'sheet' for spreadsheets"
         ),
+      content: z
+        .string()
+        .optional()
+        .describe(
+          "Optional raw content for the artifact. For kind:'sheet', pass the full CSV (header row + data rows, comma-separated, quote fields containing commas). If omitted, content is generated from the title."
+        ),
     }),
-    execute: async ({ title, kind }) => {
+    execute: async ({ title, kind, content }) => {
       const id = generateUUID();
 
       dataStream.write({
@@ -69,6 +75,7 @@ export const createDocument = ({
       await documentHandler.onCreateDocument({
         id,
         title,
+        content,
         dataStream,
         session,
         modelId,

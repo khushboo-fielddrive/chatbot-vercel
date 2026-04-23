@@ -222,7 +222,7 @@ export async function POST(request: Request) {
             isReasoningModel && !supportsTools
               ? []
               : validatedEventContext
-                ? eventToolNames
+                ? ([...eventToolNames, "createDocument"] as const)
                 : [
                   "getWeather",
                   "createDocument",

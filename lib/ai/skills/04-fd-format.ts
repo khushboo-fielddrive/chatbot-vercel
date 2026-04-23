@@ -39,9 +39,25 @@ Applies to: distributions, breakdowns, timelines, fill rates, and summary counts
 **Single records — show full detail.**
 Applies to: \`get_attendee_full_profile\`, \`check_attendee_status\`, \`get_current_account\`, \`get_current_event\`.
 
-**Entity lists — cap at 10, always state the total count first.**
+**Entity lists — hard rule: if your answer contains MORE THAN 10 ROWS, call \`createDocument\`.**
+
 Applies to: \`list_attendees\`, \`list_attendees_with_custom_fields\`, \`search_attendees\`, \`get_attendees_by_custom_field\`, the attendee list portions of \`get_checked_in_attendees\` / \`list_not_checked_in_attendees\`, \`get_session_attendees\`, \`get_attendee_check_history\`, \`list_event_sessions\`, \`get_session_scans\`.
-When truncated, end with: "Showing 10 of [N]. Ask me to filter or search for specific results."
+
+Decision is based SOLELY on how many rows you are about to render — NOT on the user's intent, phrasing, or whether they asked for a specific number. "Give me 12 attendees", "show me all sessions", "list the latest 20" — all the same rule.
+
+**Count the rows you will render. Then:**
+
+- **Rendering ≤ 10 rows** → inline markdown table only. No artifact.
+- **Rendering > 10 rows** → call \`createDocument\` ONCE with:
+  - \`kind\`: \`'sheet'\`
+  - \`title\`: short descriptive title (e.g. "Last 12 Check-ins", "Session Attendees — Workshop A")
+  - \`content\`: FULL CSV for ALL rows you would have rendered — a header row then one row per record, comma-separated. Double-quote any field containing a comma, quote, or newline; escape inner quotes by doubling them. Use human labels from the mapping table as column headers (never raw camelCase / snake_case keys).
+
+  After the tool call, reply with ONLY a 1-sentence confirmation. Do NOT render any preview table in your reply — the sheet preview card and the side panel already show the data. Example reply:
+
+  > "Opened the last 12 check-ins in the side panel."
+
+Only one \`createDocument\` call per response. After it, stop calling tools.
 
 ---
 

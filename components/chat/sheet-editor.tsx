@@ -55,21 +55,38 @@ const PureSpreadsheetEditor = ({ content, saveContent }: SheetEditorProps) => {
         "border-t border-r dark:bg-neutral-900 dark:text-neutral-50",
     };
 
-    const dataColumns = Array.from({ length: MIN_COLS }, (_, i) => ({
-      key: i.toString(),
-      name: String.fromCharCode(65 + i),
-      renderEditCell: textEditor,
-      width: 120,
-      cellClass: cn("border-t dark:bg-neutral-950 dark:text-neutral-50", {
-        "border-l": i !== 0,
-      }),
-      headerCellClass: cn("border-t dark:bg-neutral-900 dark:text-neutral-50", {
-        "border-l": i !== 0,
-      }),
-    }));
+    const widestByColumn = new Array(MIN_COLS).fill(0);
+    for (const row of parseData) {
+      for (let i = 0; i < MIN_COLS; i++) {
+        const len = (row[i] ?? "").length;
+        if (len > widestByColumn[i]) {
+          widestByColumn[i] = len;
+        }
+      }
+    }
+
+    const dataColumns = Array.from({ length: MIN_COLS }, (_, i) => {
+      const contentWidth = Math.min(
+        Math.max(widestByColumn[i] * 8 + 24, 120),
+        360
+      );
+      return {
+        key: i.toString(),
+        name: String.fromCharCode(65 + i),
+        renderEditCell: textEditor,
+        width: contentWidth,
+        cellClass: cn("border-t dark:bg-neutral-950 dark:text-neutral-50", {
+          "border-l": i !== 0,
+        }),
+        headerCellClass: cn(
+          "border-t dark:bg-neutral-900 dark:text-neutral-50",
+          { "border-l": i !== 0 }
+        ),
+      };
+    });
 
     return [rowNumberColumn, ...dataColumns];
-  }, []);
+  }, [parseData]);
 
   const initialRows = useMemo(() => {
     return parseData.map((row, rowIndex) => {

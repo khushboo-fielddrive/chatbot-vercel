@@ -5,7 +5,16 @@ import { createDocumentHandler } from "@/lib/artifacts/server";
 
 export const sheetDocumentHandler = createDocumentHandler<"sheet">({
   kind: "sheet",
-  onCreateDocument: async ({ title, dataStream, modelId }) => {
+  onCreateDocument: async ({ title, content, dataStream, modelId }) => {
+    if (content) {
+      dataStream.write({
+        type: "data-sheetDelta",
+        data: content,
+        transient: true,
+      });
+      return content;
+    }
+
     let draftContent = "";
 
     const { fullStream } = streamText({

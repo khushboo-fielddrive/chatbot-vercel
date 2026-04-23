@@ -80,7 +80,7 @@ export function DocumentPreview({
     const title = result?.title ?? args?.title ?? artifact.title;
 
     return (
-      <div className="w-full max-w-[450px]">
+      <div className="w-full max-w-full">
         {title ? (
           <DocumentHeader isStreaming={true} kind={kind} title={title} />
         ) : (
@@ -117,7 +117,7 @@ export function DocumentPreview({
   }
 
   return (
-    <div className="relative w-full max-w-[450px] cursor-pointer">
+    <div className="relative w-full max-w-full cursor-pointer">
       <HitboxLayer
         hitboxRef={hitboxRef}
         result={result}
@@ -134,7 +134,7 @@ export function DocumentPreview({
 }
 
 const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
-  <div className="w-full max-w-[450px]">
+  <div className="w-full max-w-full">
     <div className="flex flex-row items-center justify-between gap-2 rounded-t-2xl border border-b-0 border-border/50 px-4 py-3 dark:bg-muted">
       <div className="flex flex-row items-center gap-2.5">
         <div className="size-3.5 animate-pulse rounded bg-muted-foreground/15" />
