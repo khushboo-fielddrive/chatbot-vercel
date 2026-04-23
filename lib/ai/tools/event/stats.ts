@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { eventPool, fetchAll, query } from "@/lib/db/event-db";
 
-export function createStatsTools(eventId: number) {
+export function createStatsTools(accountId: number, eventId: number) {
   return {
     get_event_overview: tool({
       description:
@@ -20,39 +20,47 @@ export function createStatsTools(eventId: number) {
           await Promise.all([
             eventPool.query(
               `SELECT COUNT(*) AS total_attendees,
-                      SUM(checkinAt IS NOT NULL) AS checked_in,
-                      SUM(checkinAt IS NULL) AS not_checked_in,
-                      ROUND(SUM(checkinAt IS NOT NULL) / NULLIF(COUNT(*), 0) * 100, 1) AS check_in_pct
-               FROM Attendee WHERE event_id = ? AND deleted = 0`,
-              [eventId],
+                      SUM(a.checkinAt IS NOT NULL) AS checked_in,
+                      SUM(a.checkinAt IS NULL) AS not_checked_in,
+                      ROUND(SUM(a.checkinAt IS NOT NULL) / NULLIF(COUNT(*), 0) * 100, 1) AS check_in_pct
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0`,
+              [accountId, eventId],
             ) as Promise<[any[], any]>,
             eventPool.query(
               `SELECT COUNT(*) AS last_hour_checkins
-               FROM Attendee
-               WHERE event_id = ? AND deleted = 0
-                 AND checkinAt >= NOW() - INTERVAL 1 HOUR`,
-              [eventId],
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0
+                 AND a.checkinAt >= NOW() - INTERVAL 1 HOUR`,
+              [accountId, eventId],
             ) as Promise<[any[], any]>,
             eventPool.query(
               `SELECT ac.name AS category, COUNT(a.id) AS total, SUM(a.checkinAt IS NOT NULL) AS checked_in
                FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
                LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
                WHERE a.event_id = ? AND a.deleted = 0
                GROUP BY a.category_id, ac.name
                ORDER BY total DESC`,
-              [eventId],
+              [accountId, eventId],
             ) as Promise<[any[], any]>,
             eventPool.query(
-              `SELECT registrationStatus AS status, COUNT(*) AS count
-               FROM Attendee WHERE event_id = ? AND deleted = 0
-               GROUP BY registrationStatus ORDER BY count DESC`,
-              [eventId],
+              `SELECT a.registrationStatus AS status, COUNT(*) AS count
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0
+               GROUP BY a.registrationStatus ORDER BY count DESC`,
+              [accountId, eventId],
             ) as Promise<[any[], any]>,
             eventPool.query(
-              `SELECT approvalStatus AS status, COUNT(*) AS count
-               FROM Attendee WHERE event_id = ? AND deleted = 0
-               GROUP BY approvalStatus ORDER BY count DESC`,
-              [eventId],
+              `SELECT a.approvalStatus AS status, COUNT(*) AS count
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0
+               GROUP BY a.approvalStatus ORDER BY count DESC`,
+              [accountId, eventId],
             ) as Promise<[any[], any]>,
           ]);
 
@@ -73,12 +81,13 @@ export function createStatsTools(eventId: number) {
                     COUNT(ss.id) AS checked_in,
                     ROUND(COUNT(ss.id) / NULLIF(es.maxPeople, 0) * 100, 1) AS fill_pct
              FROM EventSession es
+             JOIN Event e ON e.id = es.event_id AND e.account_id = ? AND e.deleted = 0
              LEFT JOIN SessionReservation sr ON sr.session = es.id AND sr.deleted = 0
              LEFT JOIN SessionScan ss ON ss.sessionReservation_id = sr.id AND ss.sessionScanType = 1
              WHERE es.event_id = ? AND es.deleted = 0
              GROUP BY es.id, es.name, es.maxPeople
              ORDER BY fill_pct DESC`,
-            [eventId],
+            [accountId, eventId],
           );
         }
 
@@ -86,48 +95,147 @@ export function createStatsTools(eventId: number) {
       },
     }),
 
-    get_checked_in_attendees: tool({
+    get_checkin_status_list: tool({
       description:
-        "Returns summary counts and the full list of attendees who have checked in (checkinAt IS NOT NULL). For those NOT checked in, use list_not_checked_in_attendees.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const [[summaryRows], attendees] = await Promise.all([
-          eventPool.query(
-            `SELECT COUNT(*) AS total_attendees, SUM(checkinAt IS NOT NULL) AS checked_in_count
-             FROM Attendee WHERE event_id = ? AND deleted = 0`,
-            [eventId],
-          ) as Promise<[any[], any]>,
-          fetchAll(
-            `SELECT id, name, email, barcode, checkinAt, checkinMode, location, operator
-             FROM Attendee
-             WHERE event_id = ? AND deleted = 0 AND checkinAt IS NOT NULL
-             ORDER BY checkinAt DESC`,
-            [eventId],
-          ),
-        ]);
-        return JSON.stringify({ summary: summaryRows[0], attendees }, null, 2);
-      },
-    }),
+        "Returns checked-in and not-checked-in attendees in a single call. Pass filter='checked_in' for arrivals, filter='not_checked_in' for missing attendees, or filter='both' for the full picture. When either list exceeds 100 rows, returns aggregate stats (category breakdown, mode split, location activity, hourly timeline for checked-in; category + registration + approval status for not-checked-in) instead of raw rows. For counts only, use get_category_breakdown.",
+      inputSchema: z.object({
+        filter: z
+          .enum(["checked_in", "not_checked_in", "both"])
+          .default("both")
+          .describe("Which group to return: 'checked_in', 'not_checked_in', or 'both'"),
+      }),
+      execute: async ({ filter }) => {
+        // Always fetch overall summary
+        const [[summaryRow]] = await eventPool.query(
+          `SELECT
+             COUNT(*) AS total_attendees,
+             SUM(a.checkinAt IS NOT NULL) AS checked_in_count,
+             SUM(a.checkinAt IS NULL)     AS not_checked_in_count
+           FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0`,
+          [accountId, eventId],
+        ) as [any[], any];
 
-    list_not_checked_in_attendees: tool({
-      description: "Returns attendees who have NOT checked in yet. Use for 'who hasn't arrived?'",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const [[summaryRows], attendees] = await Promise.all([
-          eventPool.query(
-            `SELECT COUNT(*) AS not_checked_in_count
-             FROM Attendee WHERE event_id = ? AND deleted = 0 AND checkinAt IS NULL`,
-            [eventId],
-          ) as Promise<[any[], any]>,
-          fetchAll(
-            `SELECT id, name, email, barcode, registrationStatus, approvalStatus, category_id
-             FROM Attendee
-             WHERE event_id = ? AND deleted = 0 AND checkinAt IS NULL
-             ORDER BY name`,
-            [eventId],
-          ),
-        ]);
-        return JSON.stringify({ summary: summaryRows[0], attendees }, null, 2);
+        const checkedInCount = Number(summaryRow.checked_in_count ?? 0);
+        const notCheckedInCount = Number(summaryRow.not_checked_in_count ?? 0);
+        const result: Record<string, unknown> = { summary: summaryRow };
+
+        // ── Checked-in section ────────────────────────────────────────────
+        if (filter === "checked_in" || filter === "both") {
+          if (checkedInCount > 100) {
+            const [categoryRows, modeRows, locationRows, timelineRows] = await Promise.all([
+              fetchAll(
+                `SELECT ac.name AS category,
+                        COUNT(a.id) AS checked_in
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                 GROUP BY a.category_id, ac.name ORDER BY checked_in DESC`,
+                [accountId, eventId],
+              ),
+              fetchAll(
+                `SELECT COALESCE(NULLIF(TRIM(a.checkinMode), ''), 'unknown') AS mode, COUNT(*) AS count
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                 GROUP BY mode ORDER BY count DESC`,
+                [accountId, eventId],
+              ),
+              fetchAll(
+                `SELECT COALESCE(NULLIF(TRIM(a.location), ''), 'unknown') AS location, COUNT(*) AS checkins
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                 GROUP BY location ORDER BY checkins DESC`,
+                [accountId, eventId],
+              ),
+              fetchAll(
+                `SELECT DATE_FORMAT(
+                           FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(a.checkinAt) / 3600) * 3600),
+                           '%Y-%m-%d %H:%i'
+                         ) AS hour_slot,
+                         COUNT(*) AS checkins
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                 GROUP BY hour_slot ORDER BY hour_slot`,
+                [accountId, eventId],
+              ),
+            ]);
+            result.checked_in = {
+              count: checkedInCount,
+              stats_only: true,
+              category_breakdown: categoryRows,
+              mode_split: modeRows,
+              location_activity: locationRows,
+              hourly_timeline: timelineRows,
+            };
+          } else {
+            const rows = await fetchAll(
+              `SELECT a.id, a.name, a.email, a.barcode, a.checkinAt, a.checkinMode, a.location, a.operator
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+               ORDER BY a.checkinAt DESC`,
+              [accountId, eventId],
+            );
+            result.checked_in = { count: checkedInCount, data: rows };
+          }
+        }
+
+        // ── Not-checked-in section ────────────────────────────────────────
+        if (filter === "not_checked_in" || filter === "both") {
+          if (notCheckedInCount > 100) {
+            const [categoryRows, regRows, approvalRows] = await Promise.all([
+              fetchAll(
+                `SELECT ac.name AS category, COUNT(a.id) AS not_checked_in
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NULL
+                 GROUP BY a.category_id, ac.name ORDER BY not_checked_in DESC`,
+                [accountId, eventId],
+              ),
+              fetchAll(
+                `SELECT a.registrationStatus AS status, COUNT(*) AS count
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NULL
+                 GROUP BY a.registrationStatus ORDER BY count DESC`,
+                [accountId, eventId],
+              ),
+              fetchAll(
+                `SELECT a.approvalStatus AS status, COUNT(*) AS count
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NULL
+                 GROUP BY a.approvalStatus ORDER BY count DESC`,
+                [accountId, eventId],
+              ),
+            ]);
+            result.not_checked_in = {
+              count: notCheckedInCount,
+              stats_only: true,
+              category_breakdown: categoryRows,
+              registration_status: regRows,
+              approval_status: approvalRows,
+            };
+          } else {
+            const rows = await fetchAll(
+              `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus, a.category_id
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NULL
+               ORDER BY a.name`,
+              [accountId, eventId],
+            );
+            result.not_checked_in = { count: notCheckedInCount, data: rows };
+          }
+        }
+
+        return JSON.stringify(result, null, 2);
       },
     }),
 
@@ -140,14 +248,15 @@ export function createStatsTools(eventId: number) {
       execute: async ({ q }) => {
         const like = `%${q}%`;
         return query(
-          `SELECT id, name, email, barcode,
-                  (checkinAt IS NOT NULL) AS has_checked_in,
-                  checkinAt, checkinMode, location, operator, registrationStatus
-           FROM Attendee
-           WHERE event_id = ? AND deleted = 0
-             AND (name LIKE ? OR email = ? OR barcode = ?)
+          `SELECT a.id, a.name, a.email, a.barcode,
+                  (a.checkinAt IS NOT NULL) AS has_checked_in,
+                  a.checkinAt, a.checkinMode, a.location, a.operator, a.registrationStatus
+           FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0
+             AND (a.name LIKE ? OR a.email = ? OR a.barcode = ?)
            LIMIT 10`,
-          [eventId, like, q, q],
+          [accountId, eventId, like, q, q],
         );
       },
     }),
@@ -167,11 +276,12 @@ export function createStatsTools(eventId: number) {
                   afv.label AS field_label,
                   afv.responseValue AS field_value
            FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
            JOIN AttendeeFieldValue afv ON afv.ATTENDEE_ID = a.id
            WHERE a.event_id = ? AND a.deleted = 0
              AND afv.label LIKE ? AND afv.responseValue LIKE ?
            ORDER BY a.name`,
-          [eventId, `%${field_label}%`, `%${field_value}%`],
+          [accountId, eventId, `%${field_label}%`, `%${field_value}%`],
         );
         return JSON.stringify(rows, null, 2);
       },
@@ -192,12 +302,13 @@ export function createStatsTools(eventId: number) {
         return query(
           `SELECT afv.responseValue AS value, COUNT(DISTINCT a.id) AS count
            FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
            JOIN AttendeeFieldValue afv ON afv.ATTENDEE_ID = a.id
            WHERE a.event_id = ? AND a.deleted = 0 AND afv.label LIKE ?
            ${checkinFilter}
            GROUP BY afv.responseValue
            ORDER BY count DESC`,
-          [eventId, `%${field_label}%`],
+          [accountId, eventId, `%${field_label}%`],
         );
       },
     }),
@@ -213,11 +324,12 @@ export function createStatsTools(eventId: number) {
              COUNT(a.id) AS total,
              SUM(a.checkinAt IS NOT NULL) AS checked_in
            FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
            LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
            WHERE a.event_id = ? AND a.deleted = 0
            GROUP BY a.category_id, ac.name
            ORDER BY total DESC`,
-          [eventId],
+          [accountId, eventId],
         ),
     }),
 
@@ -228,16 +340,20 @@ export function createStatsTools(eventId: number) {
       execute: async () => {
         const [regRows, approvalRows] = await Promise.all([
           eventPool.query(
-            `SELECT registrationStatus AS status, COUNT(*) AS count
-             FROM Attendee WHERE event_id = ? AND deleted = 0
-             GROUP BY registrationStatus ORDER BY count DESC`,
-            [eventId],
+            `SELECT a.registrationStatus AS status, COUNT(*) AS count
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0
+             GROUP BY a.registrationStatus ORDER BY count DESC`,
+            [accountId, eventId],
           ),
           eventPool.query(
-            `SELECT approvalStatus AS status, COUNT(*) AS count
-             FROM Attendee WHERE event_id = ? AND deleted = 0
-             GROUP BY approvalStatus ORDER BY count DESC`,
-            [eventId],
+            `SELECT a.approvalStatus AS status, COUNT(*) AS count
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0
+             GROUP BY a.approvalStatus ORDER BY count DESC`,
+            [accountId, eventId],
           ),
         ]) as [[any[], any], [any[], any]];
 
@@ -251,7 +367,7 @@ export function createStatsTools(eventId: number) {
 
     get_session_attendance_stats: tool({
       description:
-        "For each session, returns name, capacity, reserved count, checked-in count, and fill rate. Use for 'how full is session X?', 'session attendance overview'.",
+        "For each session, returns name, capacity, reserved count, checked-in count, and fill rate. Use for 'how full is session X?', 'session attendance overview'. Do NOT call this if you need the individual attendee list for a session — use get_session_attendees instead.",
       inputSchema: z.object({}),
       execute: async () =>
         query(
@@ -265,12 +381,13 @@ export function createStatsTools(eventId: number) {
              COUNT(ss.id) AS checked_in,
              ROUND(COUNT(ss.id) / NULLIF(es.maxPeople, 0) * 100, 1) AS fill_pct
            FROM EventSession es
+           JOIN Event e ON e.id = es.event_id AND e.account_id = ? AND e.deleted = 0
            LEFT JOIN SessionReservation sr ON sr.session = es.id AND sr.deleted = 0
            LEFT JOIN SessionScan ss ON ss.sessionReservation_id = sr.id AND ss.sessionScanType = 1
            WHERE es.event_id = ? AND es.deleted = 0
            GROUP BY es.id, es.name, es.startDateTime, es.maxPeople
            ORDER BY es.startDateTime`,
-          [eventId],
+          [accountId, eventId],
         ),
     }),
 
@@ -289,18 +406,20 @@ export function createStatsTools(eventId: number) {
         const [[currentRows], [previousRows]] = await Promise.all([
           eventPool.query(
             `SELECT COUNT(*) AS count
-             FROM Attendee
-             WHERE event_id = ? AND deleted = 0
-               AND checkinAt >= NOW() - INTERVAL ? MINUTE`,
-            [eventId, window_mins],
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0
+               AND a.checkinAt >= NOW() - INTERVAL ? MINUTE`,
+            [accountId, eventId, window_mins],
           ) as Promise<[any[], any]>,
           eventPool.query(
             `SELECT COUNT(*) AS count
-             FROM Attendee
-             WHERE event_id = ? AND deleted = 0
-               AND checkinAt >= NOW() - INTERVAL ? MINUTE
-               AND checkinAt <  NOW() - INTERVAL ? MINUTE`,
-            [eventId, window_mins * 2, window_mins],
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0
+               AND a.checkinAt >= NOW() - INTERVAL ? MINUTE
+               AND a.checkinAt <  NOW() - INTERVAL ? MINUTE`,
+            [accountId, eventId, window_mins * 2, window_mins],
           ) as Promise<[any[], any]>,
         ]);
 
@@ -340,15 +459,16 @@ export function createStatsTools(eventId: number) {
         query(
           `SELECT
              DATE_FORMAT(
-               FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(checkinAt) / (? * 60)) * (? * 60)),
+               FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(a.checkinAt) / (? * 60)) * (? * 60)),
                '%Y-%m-%d %H:%i'
              ) AS time_slot,
              COUNT(*) AS checkins
-           FROM Attendee
-           WHERE event_id = ? AND deleted = 0 AND checkinAt IS NOT NULL
+           FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
            GROUP BY time_slot
            ORDER BY time_slot`,
-          [slot_mins, slot_mins, eventId],
+          [slot_mins, slot_mins, accountId, eventId],
         ),
     }),
   };

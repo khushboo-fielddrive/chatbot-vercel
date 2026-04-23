@@ -1,30 +1,46 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { fetchAll, query } from "@/lib/db/event-db";
+import { eventPool, fetchAll, query } from "@/lib/db/event-db";
 
-export function createSessionTools(eventId: number) {
+export function createSessionTools(accountId: number, eventId: number) {
   return {
     list_event_sessions: tool({
       description: "List all sessions for the event.",
       inputSchema: z.object({}),
       execute: async () =>
         query(
-          `SELECT id, name, startDateTime, endDateTime, maxPeople, mode,
-                  allowScanningOut, allowForcedCheckIn, location_id
-           FROM EventSession
-           WHERE event_id = ? AND deleted = 0
-           ORDER BY startDateTime`,
-          [eventId],
+          `SELECT es.id, es.name, es.startDateTime, es.endDateTime, es.maxPeople, es.mode,
+                  es.allowScanningOut, es.allowForcedCheckIn, es.location_id
+           FROM EventSession es
+           JOIN Event e ON e.id = es.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE es.event_id = ? AND es.deleted = 0
+           ORDER BY es.startDateTime`,
+          [accountId, eventId],
         ),
     }),
 
     get_session_attendees: tool({
       description:
-        "List attendees registered for a specific session with their name, email, check-in status, and reservation details. Use for 'who is in session X?'",
+        "List attendees registered for a specific session with their name, email, check-in status, and reservation details. Use for 'who is in session X?'. Do NOT call this if you only need fill rate or capacity — use get_session_attendance_stats instead.",
       inputSchema: z.object({
         session_id: z.number().describe("Session ID"),
       }),
       execute: async ({ session_id }) => {
+        const [[countRow]] = await eventPool.query(
+          `SELECT COUNT(*) AS total
+           FROM SessionReservation sr
+           JOIN Event e ON e.id = sr.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE sr.session = ? AND sr.event_id = ? AND sr.deleted = 0`,
+          [accountId, session_id, eventId],
+        ) as [any[], any];
+        const total = Number(countRow.total);
+        if (total > 100) {
+          return JSON.stringify({
+            total,
+            data: [],
+            message: `${total} attendees in this session — too many to list. Use get_session_attendance_stats for fill rate or search_attendees to find a specific person.`,
+          }, null, 2);
+        }
         const rows = await fetchAll(
           `SELECT
              a.id                                AS attendee_id,
@@ -37,15 +53,16 @@ export function createSessionTools(eventId: number) {
              (COUNT(ss.id) > 0)                  AS session_checked_in,
              MAX(ss.scanAt)                      AS session_checkin_at
            FROM SessionReservation sr
-           JOIN Attendee a ON a.id = sr.attendee
+           JOIN Attendee a ON a.id = sr.attendee AND a.deleted = 0
+           JOIN Event e ON e.id = sr.event_id AND e.account_id = ? AND e.deleted = 0
            LEFT JOIN SessionScan ss
                   ON ss.sessionReservation_id = sr.id AND ss.sessionScanType = 1
-           WHERE sr.session = ? AND sr.event_id = ? AND sr.deleted = 0 AND a.deleted = 0
+           WHERE sr.session = ? AND sr.event_id = ? AND sr.deleted = 0
            GROUP BY a.id, a.name, a.email, a.barcode, sr.id, sr.cancelled, a.checkinAt
            ORDER BY a.name`,
-          [session_id, eventId],
+          [accountId, session_id, eventId],
         );
-        return JSON.stringify(rows, null, 2);
+        return JSON.stringify({ total, data: rows }, null, 2);
       },
     }),
 
@@ -59,9 +76,10 @@ export function createSessionTools(eventId: number) {
           `SELECT ss.id, ss.scanAt, ss.sessionScanType, ss.operator, ss.location, ss.device, ss.checkinMode
            FROM SessionScan ss
            JOIN SessionReservation sr ON sr.id = ss.sessionReservation_id
+           JOIN Event e ON e.id = sr.event_id AND e.account_id = ? AND e.deleted = 0
            WHERE ss.sessionReservation_id = ? AND sr.event_id = ? AND sr.deleted = 0
            ORDER BY ss.scanAt DESC`,
-          [session_reservation_id, eventId],
+          [accountId, session_reservation_id, eventId],
         ),
     }),
   };

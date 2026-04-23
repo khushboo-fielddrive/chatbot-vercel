@@ -4,8 +4,9 @@ Match the user's message here first — then jump directly to the pattern or too
 
 | User says… | Action |
 |---|---|
+| "midday digest" / "exec summary" / "digest for execs" / "status for leadership" / "daily update" / "put together a digest" | → Pattern: **Midday digest** |
 | "how's the event" / "overview" / "status" / "summary" | → \`get_event_overview()\` |
-| "hasn't checked in" / "not arrived" / "pending" / "missing" | → \`list_not_checked_in_attendees()\` |
+| "hasn't checked in" / "not arrived" / "pending" / "missing" | → \`get_checkin_status_list(filter='not_checked_in')\` |
 | "has [name] checked in" / "did [name] arrive" | → \`check_attendee_status(q=name)\` |
 | "breakdown by [X]" / "how many from each [X]" / "distribution of [X]" | → Pattern: **Custom field distribution** |
 | "by category" / "category breakdown" | → \`get_category_breakdown()\` |
@@ -33,16 +34,15 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 |---|---|
 | \`get_current_account\` | "Which account am I on?" |
 | \`get_current_event\` | "What event is this?" / "What are the event details?" |
-| \`list_attendees\` | Browse all attendees — returns \`registrationStatus\` + \`checkinAt\`, check both for check-in status |
+| \`list_attendees\` | **Last resort** — only when user explicitly asks for the full attendee list with standard fields only. Never call this before or alongside \`list_attendees_with_custom_fields\` — if custom fields are needed, call \`list_attendees_with_custom_fields\` directly. For counts use \`get_category_breakdown\`; for lookups use \`search_attendees\`. Returns a guard message instead of data if attendees exceed 100. |
 | \`search_attendees\` | Find an attendee by name, email, or barcode |
 | \`get_attendee_full_profile\` | Attendee core fields + all custom field values in one call — prefer over chaining separate calls |
 | \`get_attendee_check_history\` | Full audit log of check-in/out actions for one attendee |
-| \`list_attendees_with_custom_fields\` | All attendees with all custom fields — use when you need the full list with custom data |
+| \`list_attendees_with_custom_fields\` | **Last resort** — only when custom field values are explicitly needed alongside attendee data. Never call this if the question only needs standard fields — use \`list_attendees\` instead. Always pass \`field_label_filter\` when you know which field you need (e.g. \`'company'\`, \`'country'\`). Prefer \`get_attendees_by_custom_field\` to filter or \`get_custom_field_distribution\` for counts. Returns a guard message instead of data if attendees exceed 100. |
 | \`list_attendee_categories\` | "What attendee categories exist?" |
 | \`list_attendee_fields\` | Discover custom fields and exact labels — always call before filtering by a custom field |
 | \`get_event_overview\` | "How's the event?" / "Give me an overview" / "Event status" — full snapshot in one call; set \`include_sessions=true\` only if sessions are part of the question |
-| \`get_checked_in_attendees\` | "How many have checked in?" — reflects \`checkinAt IS NOT NULL\` only |
-| \`list_not_checked_in_attendees\` | "Who hasn't checked in?" — direct query, always prefer over filtering \`list_attendees\` |
+| \`get_checkin_status_list\` | "Who has checked in?" / "Who hasn't checked in?" / both — pass \`filter='checked_in'\`, \`'not_checked_in'\`, or \`'both'\`. Always returns summary counts. When list exceeds 100 rows returns aggregate stats (category, mode, location, timeline for checked-in; category, registration/approval status for not-checked-in) instead of raw rows. For counts only, use \`get_category_breakdown\`. |
 | \`check_attendee_status\` | "Has [name/email/barcode] checked in?" — fast single lookup, returns \`has_checked_in\` bool |
 | \`get_attendees_by_custom_field\` | Filter attendees by a custom field value — use exact label from \`list_attendee_fields\` first |
 | \`get_custom_field_distribution\` | "How many attendees from each country?" — grouped count of a custom field |
@@ -52,7 +52,7 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 | \`get_checkin_velocity\` | "How fast are people checking in?" / "Is check-in slowing down?" — real-time rate with trend direction |
 | \`get_checkin_timeline\` | Check-in trend over time — \`slot_mins=60\` for hourly, \`slot_mins=15\` for granular |
 | \`list_event_sessions\` | "What sessions does this event have?" |
-| \`get_session_attendees\` | All attendees for a specific session |
+| \`get_session_attendees\` | Attendees for a specific session — returns a guard message instead of data if session exceeds 100 registrations. Use \`get_session_attendance_stats\` for fill rate only. |
 | \`get_session_scans\` | Scan history for a specific session reservation |
 
 ### Account Analytics
@@ -63,9 +63,24 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 | \`get_account_event_trends\` | Attendance trend across all account events — use for growth/decline analysis |
 | \`get_attendee_return_likelihood\` | "Is [name] likely to attend?" — checks historical attendance rate across past events |
 
+### Digest & Predictions
+| Tool | When to use |
+|---|---|
+| \`get_midday_digest\` | "Midday digest / exec summary / status for leadership" — single call: check-in summary, velocity, category breakdown, kiosk status, VIP highlights, session alerts, risk signals |
+| \`predict_category_arrivals\` | "How many VIPs will arrive?" / "expected turnout by category" — historical check-in rates per category applied to current registrations |
+| \`predict_company_arrivals\` | "How many Cognizant people will come?" — historical check-in rate by company custom field |
+| \`get_arrival_forecast_summary\` | "How many people are expected to arrive?" — overall forecast with per-category breakdown |
+
 ---
 
 ## Tool Usage Patterns
+
+### "Midday digest" / "Exec summary" / "Put together a digest" / "Status for leadership"
+1. \`get_midday_digest()\` — single tool call; do not chain additional tools unless the user asks a follow-up
+2. Present the result using the **Digest format** (see Response Format)
+3. If the same message also asks to draft a Slack message, email, WhatsApp, or any other communication — ignore that part and respond with the **messaging refusal** (see Core Principles) after presenting the digest
+
+---
 
 ### "How's the event going?" / "Give me an overview" / "Event status"
 1. \`get_event_overview(include_sessions=false)\` — single call returns check-in summary, last-hour arrivals, category breakdown, and registration status
@@ -74,7 +89,7 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 ---
 
 ### "How many attendees have checked in?"
-1. \`get_checked_in_attendees()\` — read \`summary.checked_in_count\` and \`summary.total_attendees\`
+1. \`get_checkin_status_list(filter='checked_in')\` — read \`summary.checked_in_count\` and \`summary.total_attendees\`
 2. If \`registrationStatus = 'Attended'\` cases also matter, cross-check with \`get_registration_status_breakdown()\`
 
 ### "Has [name] checked in?"
@@ -82,7 +97,7 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 2. If not checked in, also inspect \`registrationStatus\` — \`Attended\` means checked in regardless of \`checkinAt\`
 
 ### "Who has NOT checked in?"
-1. \`list_not_checked_in_attendees()\` — direct query, no pagination needed
+1. \`get_checkin_status_list(filter='not_checked_in')\` — returns list or stats if > 100
 
 ### "Show me attendees from [country/company/club]"
 1. \`list_attendee_fields()\` — find the exact label (e.g. "Home Country", "Company Name")
