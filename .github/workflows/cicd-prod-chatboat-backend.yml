@@ -1,0 +1,72 @@
+name: CICD analytics-chatboat-be production
+on:
+  push:
+    branches:
+      - production
+    paths-ignore:
+      - .gitignore
+      - LICENSE
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-chatboat.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+    secrets:
+      workflow_arn: ${{ secrets.PROD_WORKFLOW_ARN }}
+
+  chatboat-docker-build:
+    needs: build
+    uses: ./.github/workflows/build-chatboat-docker.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      aws_region: eu-west-1
+      environment: production
+      account_id: 378107386143
+      service_name: rs-svc-prod2-chatboat-be
+      ecr_image_name: rs-ecr-prod2-chatboat-be
+      docker_file_name: Dockerfile
+    secrets:
+      workflow_arn: ${{ secrets.PROD_WORKFLOW_ARN }}
+
+  prod-approval-gate:
+    needs:
+      - chatboat-docker-build
+    environment: Prod
+    runs-on: ubuntu-latest
+    steps:
+      - name: approved
+        env:
+          ENV_NAME: Prod
+        run: echo "Approve for $ENV_NAME"
+
+  chatboat-docker-deploy:
+    needs: prod-approval-gate
+    uses: ./.github/workflows/deploy-chatboat-docker.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      aws_region: eu-west-1
+      environment: production
+      account_id: 378107386143
+      service_name: rs-svc-prod2-chatboat-be
+      ecr_image_name: rs-ecr-prod2-chatboat-be
+      ecr_image_task: rs-task-prod2-chatboat-be
+      ecs_cluster: rs-ecs-prod2-main
+    secrets:
+      workflow_arn: ${{ secrets.PROD_WORKFLOW_ARN }}
+
+  sentry-build-deploy:
+    needs:
+      - chatboat-docker-deploy
+    uses: ./.github/workflows/build-deploy-chatboat-sentry.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      environment: production
+    secrets:
+      workflow_arn: ${{ secrets.PROD_WORKFLOW_ARN }}

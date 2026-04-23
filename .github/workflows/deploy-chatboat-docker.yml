@@ -1,0 +1,128 @@
+name: Deploy analytics-chatboat-be docker image
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: "Working git repository"
+        required: true
+        type: string
+      pwd:
+        description: "Working directory"
+        required: true
+        type: string
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: string
+      account_id:
+        description: "Environment Account ID"
+        required: true
+        type: string
+      service_name:
+        description: "Service name"
+        required: true
+        type: string
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: string
+      ecr_image_name:
+        description: "ECR image name"
+        required: true
+        type: string
+      ecr_image_task:
+        description: "ECR image task definition name"
+        required: true
+        type: string
+      ecs_cluster:
+        description: "ECS cluster name"
+        required: true
+        type: string
+    secrets:
+      workflow_arn:
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for the Docker image"
+        default: "latest"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ENV: ${{ inputs.environment }}
+  ACCOUNTID: ${{ inputs.account_id }}
+  SERVICE: ${{ inputs.service_name }}
+  AWS_REGION: ${{ inputs.aws_region }}
+  ECR_IMAGE_NAME: ${{ inputs.ecr_image_name }}
+  ECR_IMAGE_TASK: ${{ inputs.ecr_image_task }}
+  ECS_CLUSTER: ${{ inputs.ecs_cluster }}
+
+jobs:
+  update-task-definition:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment-specific variables
+        run: |
+          echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Sanitize branch name
+        run: |
+          SANITIZED_BRANCH_NAME="${BRANCH_NAME//\//_}"
+          echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Install jq and sponge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq moreutils
+
+      - name: Create work-directory
+        run: |
+          echo "Creating Directory: ${{ inputs.pwd }}"
+          sudo mkdir -p ${{ inputs.pwd }}
+          sudo chmod -R 777 ${{ inputs.pwd }}
+
+      - name: Download Build Number Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build-number
+          path: ${{ inputs.pwd }}
+
+      - name: Set environment-specific variables
+        run: |
+          echo "VERSION=${{ github.event.inputs.version || 'latest' }}" >> $GITHUB_ENV
+          BUILD_NUMBER=$(cat ${{ inputs.pwd }}_${{ env.SANITIZED_BRANCH_NAME }}_build_number.txt | awk -F'=' '{print $2}')
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "BUILD_NUMBER: $BUILD_NUMBER"
+        working-directory: ${{ inputs.pwd }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.workflow_arn }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Check if Docker image exists
+        run: |
+          IMAGE_URI="$ACCOUNTID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_IMAGE_NAME:$BUILD_NUMBER"
+          aws ecr describe-images --repository-name $ECR_IMAGE_NAME --image-ids imageTag=$BUILD_NUMBER > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "Docker image ${IMAGE_URI} not found."
+            exit 1
+          else
+            echo "Docker image ${IMAGE_URI} exists."
+          fi
+
+      - name: Update task definition and service
+        if: success()
+        run: |
+          aws ecs describe-task-definition --task-definition $ECR_IMAGE_TASK --region $AWS_REGION --query 'taskDefinition' --output json > task-def.json
+          IMAGE_URI="$ACCOUNTID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_IMAGE_NAME:$BUILD_NUMBER"
+          jq --arg image "${IMAGE_URI}" '.containerDefinitions[0].image = $image' task-def.json | sponge task-def.json
+          jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy,.requiresCompatibilities)' task-def.json | sponge task-def.json
+          aws ecs register-task-definition --family $ECR_IMAGE_TASK --region $AWS_REGION --cli-input-json file://task-def.json
+          aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE --task-definition $ECR_IMAGE_TASK:`aws ecs describe-task-definition --task-definition $ECR_IMAGE_TASK --region $AWS_REGION --output json | jq '.taskDefinition.revision'`

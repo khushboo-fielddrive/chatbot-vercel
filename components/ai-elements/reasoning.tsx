@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
+import { createMermaidPlugin } from "@streamdown/mermaid";
 import { ChevronDownIcon } from "lucide-react";
 import {
   createContext,
@@ -200,6 +200,40 @@ export const ReasoningTrigger = memo(
 export type ReasoningContentProps = HTMLAttributes<HTMLDivElement> & {
   children: string;
 };
+
+const mermaid = createMermaidPlugin({
+  config: {
+    theme: "base",
+    fontFamily: "var(--font-geist), Geist, sans-serif",
+    themeVariables: {
+      primaryColor: "#4f46e5",
+      primaryTextColor: "#ffffff",
+      primaryBorderColor: "#3730a3",
+      secondaryColor: "#10b981",
+      secondaryTextColor: "#ffffff",
+      secondaryBorderColor: "#059669",
+      tertiaryColor: "#f59e0b",
+      tertiaryTextColor: "#1f2937",
+      tertiaryBorderColor: "#d97706",
+      pieSectionTextColor: "#ffffff",
+      pieLegendTextColor: "#374151",
+      pieStrokeColor: "#ffffff",
+      pieStrokeWidth: "2px",
+      pie1: "#4f46e5",
+      pie2: "#10b981",
+      pie3: "#f59e0b",
+      pie4: "#ef4444",
+      pie5: "#8b5cf6",
+      pie6: "#06b6d4",
+      pie7: "#ec4899",
+      pie8: "#84cc16",
+      xyChart: {
+        backgroundColor: "transparent",
+        plotColorPalette: "#4f46e5,#10b981,#f59e0b,#ef4444,#8b5cf6,#06b6d4",
+      },
+    },
+  },
+});
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 

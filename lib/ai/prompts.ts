@@ -1,5 +1,7 @@
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/chat/artifact";
+import type { EventContext } from "@/lib/ai/event-context";
+import { getSkillsPrompt } from "@/lib/ai/skills";
 
 export const artifactsPrompt = `
 Artifacts is a side panel that displays content alongside the conversation. It supports scripts (code), documents (text), and spreadsheets. Changes appear in real-time.
@@ -46,7 +48,12 @@ CRITICAL RULES:
 
 export const regularPrompt = `You are a helpful assistant. Keep responses concise and direct.
 
-When asked to write, create, or build something, do it immediately. Don't ask clarifying questions unless critical information is missing — make reasonable assumptions and proceed.`;
+When asked to write, create, or build something, do it immediately. Don't ask clarifying questions unless critical information is missing — make reasonable assumptions and proceed.
+
+When asked to visualize data as a chart or graph, use a mermaid code block:
+- Pie charts: use the "pie" diagram type
+- Bar or line charts: use the "xychart-beta" diagram type
+Do not output raw data tables when a chart was requested.`;
 
 export type RequestHints = {
   latitude: Geo["latitude"];
@@ -77,6 +84,32 @@ export const systemPrompt = ({
   }
 
   return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+};
+
+export const eventSystemPrompt = ({
+  requestHints,
+  supportsTools,
+  ctx,
+}: {
+  requestHints: RequestHints;
+  supportsTools: boolean;
+  ctx: EventContext;
+}) => {
+  const skillsPrompt = getSkillsPrompt();
+
+  const requestContext = `\
+## Request Context
+- Account ID: ${ctx.accountId}
+- Event ID: ${ctx.eventId}
+- Event Name: ${ctx.event.name}`;
+
+  const parts = [
+    ...(skillsPrompt ? [skillsPrompt] : []),
+    requestContext,
+    getRequestPromptFromHints(requestHints),
+  ];
+
+  return parts.join("\n\n");
 };
 
 export const codePrompt = `

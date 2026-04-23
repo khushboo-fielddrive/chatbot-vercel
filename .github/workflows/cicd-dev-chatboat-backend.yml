@@ -1,0 +1,62 @@
+name: CICD analytics-chatboat-be development
+on:
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - .gitignore
+      - LICENSE
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-chatboat.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be 
+      pwd: fdAnalyticsChatboat
+    secrets:
+      workflow_arn: ${{ secrets.WORKFLOW_ARN }}
+      
+  chatboat-docker-build:
+    needs: build
+    uses: ./.github/workflows/build-chatboat-docker.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      aws_region: eu-west-1
+      environment: devthree
+      account_id: 101705542333
+      service_name: rs-svc-devthree-chatboat-be
+      ecr_image_name: rs-ecr-devthree-chatboat-be
+      docker_file_name: Dockerfile
+    secrets:
+      workflow_arn: ${{ secrets.WORKFLOW_ARN }}
+
+  chatboat-docker-deploy:
+    needs: 
+      - chatboat-docker-build
+    uses: ./.github/workflows/deploy-chatboat-docker.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      aws_region: eu-west-1
+      environment: devthree
+      account_id: 101705542333
+      service_name: rs-svc-devthree-chatboat-be
+      ecr_image_name: rs-ecr-devthree-chatboat-be
+      ecr_image_task: rs-task-devthree-chatboat-be
+      ecs_cluster: rs-ecs-devthree-main
+    secrets:
+      workflow_arn: ${{ secrets.WORKFLOW_ARN }}
+
+  sentry-build-deploy:
+    needs: 
+      - chatboat-docker-deploy
+    uses: ./.github/workflows/build-deploy-chatboat-sentry.yml
+    with:
+      repository: Fielddrive-Engineering-Org/analytics-chatboat-be
+      pwd: fdAnalyticsChatboat
+      environment: devthree
+    secrets:
+      workflow_arn: ${{ secrets.WORKFLOW_ARN }}

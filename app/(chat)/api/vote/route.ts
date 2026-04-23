@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { auth } from "@/app/(auth)/auth";
 import { getChatById, getVotesByChatId, voteMessage } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
+import { resolveUser } from "@/app/(auth)/auth";
 
 const voteSchema = z.object({
   chatId: z.string(),
@@ -20,10 +20,9 @@ export async function GET(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
-    return new ChatbotError("unauthorized:vote").toResponse();
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
+    return resolved.toResponse();
   }
 
   const chat = await getChatById({ id: chatId });
@@ -32,7 +31,7 @@ export async function GET(request: Request) {
     return new ChatbotError("not_found:chat").toResponse();
   }
 
-  if (chat.userId !== session.user.id) {
+  if (chat.userId !== resolved.userId) {
     return new ChatbotError("forbidden:vote").toResponse();
   }
 
@@ -58,10 +57,9 @@ export async function PATCH(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
-    return new ChatbotError("unauthorized:vote").toResponse();
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
+    return resolved.toResponse();
   }
 
   const chat = await getChatById({ id: chatId });
@@ -70,7 +68,7 @@ export async function PATCH(request: Request) {
     return new ChatbotError("not_found:vote").toResponse();
   }
 
-  if (chat.userId !== session.user.id) {
+  if (chat.userId !== resolved.userId) {
     return new ChatbotError("forbidden:vote").toResponse();
   }
 

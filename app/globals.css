@@ -54,8 +54,8 @@
   --card-foreground: oklch(0.12 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.12 0 0);
-  --primary: oklch(0.12 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.68 0.19 128);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.965 0 0);
   --secondary-foreground: oklch(0.38 0 0);
   --muted: oklch(0.94 0 0);
@@ -73,8 +73,8 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.97 0 0);
   --sidebar-foreground: oklch(0.38 0 0);
-  --sidebar-primary: oklch(0.12 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.68 0.19 128);
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.12 0 0 / 0.06);
   --sidebar-accent-foreground: oklch(0.12 0 0);
   --sidebar-border: oklch(0.88 0 0);
@@ -101,8 +101,8 @@
   --card-foreground: oklch(0.94 0 0);
   --popover: oklch(0.225 0 0);
   --popover-foreground: oklch(0.94 0 0);
-  --primary: oklch(0.94 0 0);
-  --primary-foreground: oklch(0.195 0 0);
+  --primary: oklch(0.78 0.16 128);
+  --primary-foreground: oklch(0.15 0 0);
   --secondary: oklch(0.26 0 0);
   --secondary-foreground: oklch(0.75 0 0);
   --muted: oklch(0.165 0 0);
@@ -120,8 +120,8 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.175 0 0);
   --sidebar-foreground: oklch(0.78 0 0);
-  --sidebar-primary: oklch(0.94 0 0);
-  --sidebar-primary-foreground: oklch(0.195 0 0);
+  --sidebar-primary: oklch(0.78 0.16 128);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
   --sidebar-accent: oklch(0.94 0 0 / 0.06);
   --sidebar-accent-foreground: oklch(0.94 0 0);
   --sidebar-border: oklch(0.25 0 0);
@@ -497,4 +497,33 @@ textarea:focus-visible {
 
 [data-testid="artifact"] {
   isolation: isolate;
+}
+
+/* Mermaid diagram styling — fill chat width, no forced whitespace */
+[data-language="mermaid"] {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100%;
+}
+
+/* Hide the "mermaid" text but keep the header bar for action buttons layout */
+[data-streamdown="mermaid-block"] > div:first-child:not([data-streamdown]) {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+}
+
+[data-language="mermaid"] svg {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 480px;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Pie chart legend uses currentColor — readable in both light and dark mode */
+[data-language="mermaid"] .pieLegend text,
+[data-language="mermaid"] .legend text {
+  fill: currentColor !important;
 }

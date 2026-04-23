@@ -46,6 +46,7 @@ export function ChatShell() {
     setCurrentModelId,
     showCreditCardAlert,
     setShowCreditCardAlert,
+    eventAuthReady,
   } = useActiveChat();
 
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(
@@ -68,6 +69,20 @@ export function ChatShell() {
       setAttachments([]);
     }
   }, [chatId, setArtifact]);
+
+  useEffect(() => {
+    const blockMermaidWheel = (e: WheelEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest?.('[data-streamdown="mermaid"]')) {
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("wheel", blockMermaidWheel, { capture: true });
+    return () =>
+      document.removeEventListener("wheel", blockMermaidWheel, {
+        capture: true,
+      });
+  }, []);
 
   return (
     <>
@@ -108,7 +123,7 @@ export function ChatShell() {
             />
 
             <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-              {!isReadonly && (
+              {!isReadonly && eventAuthReady && (
                 <MultimodalInput
                   attachments={attachments}
                   chatId={chatId}

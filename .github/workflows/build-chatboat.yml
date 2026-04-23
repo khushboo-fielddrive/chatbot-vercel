@@ -1,0 +1,98 @@
+name: Build analytics-chatboat-analytics-chatboat-be
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: "Working git repository"
+        required: true
+        type: string
+      pwd:
+        description: "Working directory"
+        required: true
+        type: string
+      environment:
+        description: "Build environment (devthree, production, prod2)"
+        required: true
+        type: string
+    secrets:
+      workflow_arn:
+        required: true
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment-specific variables
+        run: |
+          echo "BRANCH_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Sanitize branch name
+        run: |
+          SANITIZED_BRANCH_NAME="${BRANCH_NAME//\//_}"
+          echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Create work-directory
+        run: mkdir -p ${{ inputs.pwd }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ github.ref_name }}
+          path: ${{ inputs.pwd }}
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: ${{ inputs.pwd }}/pnpm-lock.yaml
+
+      - name: NodeJs build
+        run: |
+          mkdir -p dist
+          pnpm install --frozen-lockfile
+          pnpm build:${{ inputs.environment }}
+          cp package.json dist/
+          cp pnpm-lock.yaml dist/
+          cp Dockerfile dist/
+          cp -r public dist/public
+          cp -r .next/standalone dist/standalone
+          cp -r .next/static dist/static
+          du -sh *
+        working-directory: ${{ inputs.pwd }}
+
+      - name: Get build number
+        id: get_build_number
+        run: |
+          echo "BUILD_NUMBER=$(git rev-parse --short HEAD)" > ${{ inputs.pwd }}_${SANITIZED_BRANCH_NAME}_build_number.txt
+          cat ${{ inputs.pwd }}_${SANITIZED_BRANCH_NAME}_build_number.txt
+        working-directory: ${{ inputs.pwd }}
+
+      - name: Upload Build Number Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build-number
+          path: ${{ inputs.pwd }}/${{ inputs.pwd }}_${{ env.SANITIZED_BRANCH_NAME }}_build_number.txt
+      
+      - name: Check Files Before Upload Build Artifact 
+        id: check_files
+        run: |
+          ls -altr
+          echo "Checking dist folder"
+          du -sh dist || echo "dist is empty"
+        working-directory: ${{ inputs.pwd }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.pwd }}-${{ env.SANITIZED_BRANCH_NAME }}-build
+          path: ${{ inputs.pwd }}/dist
+          if-no-files-found: error

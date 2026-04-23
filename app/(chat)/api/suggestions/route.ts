@@ -1,4 +1,4 @@
-import { auth } from "@/app/(auth)/auth";
+import { resolveUser } from "@/app/(auth)/auth";
 import { getSuggestionsByDocumentId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 
@@ -13,9 +13,8 @@ export async function GET(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
     return new ChatbotError("unauthorized:suggestions").toResponse();
   }
 
@@ -29,7 +28,7 @@ export async function GET(request: Request) {
     return Response.json([], { status: 200 });
   }
 
-  if (suggestion.userId !== session.user.id) {
+  if (suggestion.userId !== resolved.userId) {
     return new ChatbotError("forbidden:api").toResponse();
   }
 

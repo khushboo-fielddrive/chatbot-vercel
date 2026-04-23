@@ -59,12 +59,12 @@ function PureArtifactActions({
             <TooltipTrigger asChild>
               <button
                 className={cn(
-                  "flex items-center justify-center rounded-full p-3 text-muted-foreground transition-all duration-150",
-                  "hover:text-foreground",
+                  "flex items-center justify-center rounded-full p-3 text-primary/70 transition-all duration-150",
+                  "hover:text-primary",
                   "active:scale-95",
                   "disabled:pointer-events-none disabled:opacity-30",
                   {
-                    "text-foreground":
+                    "text-primary":
                       mode === "diff" && action.description === "View changes",
                   }
                 )}

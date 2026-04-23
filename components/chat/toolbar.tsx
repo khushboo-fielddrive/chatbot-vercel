@@ -415,7 +415,7 @@ const PureToolbar = ({
         {onClose && (
           <motion.div
             animate={{ opacity: 1 }}
-            className="p-3 text-muted-foreground transition-colors hover:text-foreground"
+            className="p-3 text-primary/70 transition-colors hover:text-primary"
             initial={{ opacity: 0 }}
             onClick={onClose}
           >
@@ -426,7 +426,7 @@ const PureToolbar = ({
         {status === "streaming" ? (
           <motion.div
             animate={{ scale: 1.4 }}
-            className="p-3"
+            className="p-3 text-primary"
             exit={{ scale: 1 }}
             initial={{ scale: 1 }}
             key="stop-icon"

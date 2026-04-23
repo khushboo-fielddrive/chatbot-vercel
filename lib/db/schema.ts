@@ -9,11 +9,12 @@ import {
   timestamp,
   uuid,
   varchar,
+  numeric
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
-  email: varchar("email", { length: 64 }).notNull(),
+  email: varchar("email", { length: 64 }).notNull().unique(),
   password: varchar("password", { length: 64 }),
   name: text("name"),
   emailVerified: boolean("emailVerified").notNull().default(false),
@@ -35,6 +36,8 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
+  eventId: text("eventId"),
+  accountId: text("accountId"),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

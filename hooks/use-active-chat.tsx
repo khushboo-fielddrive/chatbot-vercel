@@ -22,11 +22,12 @@ import { getChatHistoryPaginationKey } from "@/components/chat/sidebar-history";
 import { toast } from "@/components/chat/toast";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
 import { useAutoResume } from "@/hooks/use-auto-resume";
+import { useEventToken } from "@/hooks/use-event-token";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
-import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
+import { fetcher, fetchWithErrorHandlers, generateUUID, getEventAuthHeaders } from "@/lib/utils";
 
 type ActiveChatContextValue = {
   chatId: string;
@@ -47,6 +48,7 @@ type ActiveChatContextValue = {
   setCurrentModelId: (id: string) => void;
   showCreditCardAlert: boolean;
   setShowCreditCardAlert: Dispatch<SetStateAction<boolean>>;
+  eventAuthReady: boolean;
 };
 
 const ActiveChatContext = createContext<ActiveChatContextValue | null>(null);
@@ -57,6 +59,7 @@ function extractChatId(pathname: string): string | null {
 }
 
 export function ActiveChatProvider({ children }: { children: ReactNode }) {
+  const { ready: eventAuthReady } = useEventToken();
   const pathname = usePathname();
   const { setDataStream } = useDataStream();
   const { mutate } = useSWRConfig();
@@ -138,7 +141,10 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
             })
           );
 
+        const eventHeaders = getEventAuthHeaders();
+
         return {
+          ...(eventHeaders ? { headers: eventHeaders } : {}),
           body: {
             id: request.id,
             ...(isToolApprovalContinuation
@@ -264,6 +270,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       setCurrentModelId,
       showCreditCardAlert,
       setShowCreditCardAlert,
+      eventAuthReady,
     }),
     [
       chatId,
@@ -282,6 +289,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       votes,
       currentModelId,
       showCreditCardAlert,
+      eventAuthReady,
     ]
   );
 

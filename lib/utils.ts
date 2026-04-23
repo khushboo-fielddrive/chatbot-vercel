@@ -13,8 +13,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getEventAuthHeaders(): Record<string, string> | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = sessionStorage.getItem("event-auth");
+  if (!raw) return undefined;
+  try {
+    const { userId, eventId, accountId, token } = JSON.parse(raw);
+    return {
+      "x-event-user-id": userId,
+      "x-event-id": String(eventId),
+      "x-event-account-id": String(accountId),
+      "x-portal-token": token,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export const fetcher = async (url: string) => {
-  const response = await fetch(url);
+  const eventHeaders = getEventAuthHeaders();
+  const response = await fetch(url, {
+    ...(eventHeaders ? { headers: eventHeaders } : {}),
+  });
 
   if (!response.ok) {
     const { code, cause } = await response.json();

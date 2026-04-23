@@ -1,5 +1,6 @@
-import { auth } from "@/app/(auth)/auth";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
+import { resolveUser } from "@/app/(auth)/auth";
+import { ChatbotError } from "@/lib/errors";
 import { convertToUIMessages } from "@/lib/utils";
 
 export async function GET(request: Request) {
@@ -10,8 +11,12 @@ export async function GET(request: Request) {
     return Response.json({ error: "chatId required" }, { status: 400 });
   }
 
-  const [session, chat, messages] = await Promise.all([
-    auth(),
+  const resolved = await resolveUser(request);
+  if (resolved instanceof ChatbotError) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const [chat, messages] = await Promise.all([
     getChatById({ id: chatId }),
     getMessagesByChatId({ id: chatId }),
   ]);
@@ -25,14 +30,11 @@ export async function GET(request: Request) {
     });
   }
 
-  if (
-    chat.visibility === "private" &&
-    (!session?.user || session.user.id !== chat.userId)
-  ) {
+  if (chat.visibility === "private" && chat.userId !== resolved.userId) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const isReadonly = !session?.user || session.user.id !== chat.userId;
+  const isReadonly = chat.userId !== resolved.userId;
 
   return Response.json({
     messages: convertToUIMessages(messages),

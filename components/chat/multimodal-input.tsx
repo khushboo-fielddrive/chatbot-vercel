@@ -1,5 +1,6 @@
 "use client";
 
+import { features } from "@/lib/config/features";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
@@ -43,7 +44,7 @@ import {
   type ModelCapabilities,
 } from "@/lib/ai/models";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, getEventAuthHeaders } from "@/lib/utils";
 import {
   PromptInput,
   PromptInputFooter,
@@ -266,6 +267,7 @@ function PureMultimodalInput({
         {
           method: "POST",
           body: formData,
+          headers: getEventAuthHeaders(),
         }
       );
 
@@ -517,15 +519,19 @@ function PureMultimodalInput({
         />
         <PromptInputFooter className="px-3 pb-3">
           <PromptInputTools>
-            <AttachmentsButton
-              fileInputRef={fileInputRef}
-              selectedModelId={selectedModelId}
-              status={status}
-            />
-            <ModelSelectorCompact
-              onModelChange={onModelChange}
-              selectedModelId={selectedModelId}
-            />
+            {features.showAttachments && (
+              <AttachmentsButton
+                fileInputRef={fileInputRef}
+                selectedModelId={selectedModelId}
+                status={status}
+              />
+            )}
+            {features.showModelSelector && (
+              <ModelSelectorCompact
+                onModelChange={onModelChange}
+                selectedModelId={selectedModelId}
+              />
+            )}
           </PromptInputTools>
 
           {status === "submitted" ? (
@@ -535,7 +541,7 @@ function PureMultimodalInput({
               className={cn(
                 "h-7 w-7 rounded-xl transition-all duration-200",
                 input.trim()
-                  ? "bg-foreground text-background hover:opacity-85 active:scale-95"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/80 active:scale-95"
                   : "bg-muted text-muted-foreground/25 cursor-not-allowed"
               )}
               data-testid="send-button"
@@ -608,7 +614,7 @@ function PureAttachmentsButton({
       className={cn(
         "h-7 w-7 rounded-lg border border-border/40 p-1 transition-colors",
         hasVision
-          ? "text-foreground hover:border-border hover:text-foreground"
+          ? "text-primary/70 hover:border-primary/40 hover:text-primary"
           : "text-muted-foreground/30 cursor-not-allowed"
       )}
       data-testid="attachments-button"
@@ -800,7 +806,7 @@ function PureStopButton({
 }) {
   return (
     <Button
-      className="h-7 w-7 rounded-xl bg-foreground p-1 text-background transition-all duration-200 hover:opacity-85 active:scale-95 disabled:bg-muted disabled:text-muted-foreground/25 disabled:cursor-not-allowed"
+      className="h-7 w-7 rounded-xl bg-primary p-1 text-primary-foreground transition-all duration-200 hover:bg-primary/80 active:scale-95 disabled:bg-muted disabled:text-muted-foreground/25 disabled:cursor-not-allowed"
       data-testid="stop-button"
       onClick={(event) => {
         event.preventDefault();

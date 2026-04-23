@@ -53,15 +53,19 @@ const PurePreviewMessage = ({
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
-  const hasAnyContent = message.parts?.some(
+  const hasTextContent = message.parts?.some(
     (part) =>
       (part.type === "text" && part.text?.trim().length > 0) ||
       (part.type === "reasoning" &&
         "text" in part &&
-        part.text?.trim().length > 0) ||
-      part.type.startsWith("tool-")
+        part.text?.trim().length > 0)
   );
-  const isThinking = isAssistant && isLoading && !hasAnyContent;
+  const hasToolParts = message.parts?.some((part) =>
+    part.type.startsWith("tool-")
+  );
+
+  const isThinking = isAssistant && isLoading && !hasTextContent && !hasToolParts;
+  const showStreamingIndicator = isAssistant && isLoading && !isThinking;
 
   const attachments = attachmentsFromMessage.length > 0 && (
     <div
@@ -123,7 +127,9 @@ const PurePreviewMessage = ({
           data-testid="message-content"
           key={key}
         >
-          <MessageResponse>{sanitizeText(part.text)}</MessageResponse>
+          <MessageResponse isStreaming={isAssistant && isLoading}>
+            {sanitizeText(part.text)}
+          </MessageResponse>
         </MessageContent>
       );
     }
@@ -325,6 +331,17 @@ const PurePreviewMessage = ({
     <>
       {attachments}
       {parts}
+      <div
+        className={cn(
+          "flex items-center gap-1 py-1",
+          showStreamingIndicator ? "opacity-100" : "hidden"
+        )}
+        aria-label="Assistant is responding"
+      >
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+      </div>
       {actions}
     </>
   );
