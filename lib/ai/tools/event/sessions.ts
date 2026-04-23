@@ -66,6 +66,57 @@ export function createSessionTools(accountId: number, eventId: number) {
       },
     }),
 
+    get_session_attendee_breakdown: tool({
+      description:
+        "Aggregate all sessions' registered attendees by a given dimension — attendee category (VIP / Speaker / Cloud & Infrastructure / etc.) OR any custom field (Job Title, Company, Country, Nationality, etc.). Returns one row per (session, dimension value) with a count — no raw attendee records. Use this instead of calling get_session_attendees + list_attendees_with_custom_fields when the question is 'which [roles / companies / categories] attend which sessions?'. For custom fields, call list_attendee_fields first to get the exact label.",
+      inputSchema: z.object({
+        dimension: z
+          .string()
+          .describe(
+            "Either the literal 'category' (groups by attendee category) OR the exact custom field label from list_attendee_fields (e.g. 'Job Title', 'Company', 'Country').",
+          ),
+      }),
+      execute: async ({ dimension }) => {
+        const byCategory = dimension.trim().toLowerCase() === "category";
+        const sql = byCategory
+          ? `SELECT
+               es.id                                  AS session_id,
+               es.name                                AS session_name,
+               es.startDateTime                       AS session_start,
+               COALESCE(ac.name, '(no category)')     AS dimension_value,
+               COUNT(DISTINCT a.id)                   AS attendee_count
+             FROM EventSession es
+             JOIN SessionReservation sr
+               ON sr.session = es.id AND sr.event_id = es.event_id AND sr.deleted = 0
+             JOIN Attendee a
+               ON a.id = sr.attendee AND a.deleted = 0
+             LEFT JOIN AttendeeCategory ac
+               ON ac.id = a.category_id
+             WHERE es.event_id = ? AND es.deleted = 0
+             GROUP BY es.id, es.name, es.startDateTime, COALESCE(ac.name, '(no category)')
+             ORDER BY es.startDateTime, attendee_count DESC`
+          : `SELECT
+               es.id                                          AS session_id,
+               es.name                                        AS session_name,
+               es.startDateTime                               AS session_start,
+               COALESCE(afv.responseValue, '(not provided)')  AS dimension_value,
+               COUNT(DISTINCT a.id)                           AS attendee_count
+             FROM EventSession es
+             JOIN SessionReservation sr
+               ON sr.session = es.id AND sr.event_id = es.event_id AND sr.deleted = 0
+             JOIN Attendee a
+               ON a.id = sr.attendee AND a.deleted = 0
+             LEFT JOIN AttendeeFieldValue afv
+               ON afv.ATTENDEE_ID = a.id AND afv.label = ?
+             WHERE es.event_id = ? AND es.deleted = 0
+             GROUP BY es.id, es.name, es.startDateTime, COALESCE(afv.responseValue, '(not provided)')
+             ORDER BY es.startDateTime, attendee_count DESC`;
+        const params = byCategory ? [eventId] : [dimension, eventId];
+        const rows = await fetchAll(sql, params);
+        return JSON.stringify(rows, null, 2);
+      },
+    }),
+
     get_session_scans: tool({
       description: "Get all scans for a specific session reservation.",
       inputSchema: z.object({

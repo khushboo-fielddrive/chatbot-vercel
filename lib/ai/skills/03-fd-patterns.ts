@@ -1,4 +1,10 @@
-const content = `## Intent Routing
+const content = `## Terse prompts
+
+When the user's message is short or missing context (e.g. "Jane's journey", "VIPs checked in?", "will Acme show?"), auto-discover the fields before answering: call \`list_attendee_fields\` and/or \`list_attendee_categories\` to resolve any category name, company, or attribute. Ask at most one clarifying question, and only when the ambiguity cannot be resolved by a discovery call (e.g. two attendees with the same name). Never ask the user which field or label to use — find it yourself.
+
+---
+
+## Intent Routing
 
 Match the user's message here first — then jump directly to the pattern or tool below. Skip this step only if the intent is ambiguous.
 
@@ -23,6 +29,11 @@ Match the user's message here first — then jump directly to the pattern or too
 | "likely to attend" / "will they come back" / "return likelihood" | → \`get_attendee_return_likelihood()\` |
 | "all events" / "list events" / "past events" / "event history" | → \`list_account_events()\` |
 | "trend across events" / "attendance over time" / "across all events" | → \`get_account_event_trends()\` |
+| "journey" / "full journey" / "story of [name]" | → Pattern: **Attendee journey** |
+| "VIPs" / "speakers" / "board" / "sponsors" / any named category | → Pattern: **Category summary** |
+| "will [category/company] show up" / "how many from [X] will come" | → Pattern: **Category return likelihood** |
+| "job titles per session" / "which roles attend which session" | → Pattern: **Session audience breakdown** |
+| "overlapping sessions" / "sessions at the same time" / "back-to-back" | → Pattern: **Session overlap** |
 
 ---
 
@@ -157,11 +168,83 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 ### "Is [name] likely to attend?" / "Will they come back?"
 1. \`get_attendee_return_likelihood(name_or_email=<name or email>)\`
 2. Report the \`likelihood\` field directly: "likely" / "uncertain" / "unlikely" / "first_time"
-3. Include \`events_registered\`, \`events_attended\`, and \`attendance_rate\` for context
+3. Include the events-registered, events-attended, and attendance-rate values for context — always as human phrasing (e.g. "attended 4 of 5 past events — 80% attendance rate"), never raw field names
 4. If multiple matches are returned, list each with their individual likelihood
 
 ### "Show attendance trend across all events" / "How has attendance changed over time?"
 1. \`get_account_event_trends()\` — returns all events with metrics ordered by date
-2. Render as \`xychart-beta\` automatically (trend data — same rule as check-in timeline)`;
+2. Render as \`xychart-beta\` automatically (trend data — same rule as check-in timeline)
+
+---
+
+### Attendee journey — "show [name]'s journey" / "story of [name]" / "full journey for [name]"
+1. \`search_attendees(q=name)\` — get attendee ID. If multiple matches, ask one clarifying question.
+2. \`get_attendee_full_profile(attendee_id=<id>)\` — profile + all custom fields in one call.
+3. \`get_attendee_check_history(attendee_id=<id>)\` — full check-in/out audit log.
+4. Resolve which sessions the attendee is registered for and which they attended (use \`get_session_attendees\` on relevant sessions, or a direct attendee-to-sessions tool if one exists).
+5. Render using **all three sections below, in this exact order, with these exact headings**. Do not merge sections or drop any. Do not add a chart — a single attendee's journey is a record, not an aggregation.
+
+**Required output structure:**
+
+\`\`\`
+## [Attendee name] — Event Journey
+
+**Profile**
+- **Name:** [name]  |  **Company:** [company]  |  **Job title:** [title]
+- **Country:** [country]  |  **Nationality:** [nationality]
+- **Category:** [category]  |  **Email:** [email]
+
+**Event check-in**
+[One or two sentences: when they arrived, where (location / device), and current status. If they have not checked in, say so plainly.]
+
+**Session registrations**
+- ✓ **[Session name]** ([date], [start]–[end]) — [Attended | Registered, not yet checked in | Did not attend]
+- (one bullet per session they are registered for)
+\`\`\`
+
+If a section has no data (e.g. no session registrations), still include the heading and write "None." underneath — do not drop the section.
+
+### Category summary — "VIPs, Speakers, Board — registered vs checked in?" / any named category
+1. \`list_attendee_categories()\` — check if the name matches an attendee category directly.
+2. If no direct match, \`list_attendee_fields()\` — find a custom field whose values include the name (e.g. "Attendee Type" with value "VIP"). Do not ask the user — resolve it yourself.
+3. Resolve to either \`get_category_breakdown()\` (for direct category matches) or \`get_attendees_by_custom_field(field_label=<exact>, field_value=<category>)\` per category.
+4. For each category, compute registered count and checked-in count (using the both-signals rule from skill 01).
+5. Render using the category-summary format in skill 04: 3-column table + grouped bar chart + short list of who's still to arrive per category (up to 10).
+
+### Category return likelihood — "will VIPs show up?" / "how many from [company] will come?"
+1. Resolve the category the same way as Category summary (direct category or custom field).
+2. For each matched attendee, call \`get_attendee_return_likelihood(name_or_email=<email>)\`.
+3. Aggregate: total in category, count of likely / uncertain / unlikely / first-time, overall percentage likely.
+4. Pick the top 5 most-likely and top 5 least-likely by attendance rate.
+5. Render as: one summary line, a small pie or stacked bar of the likelihood mix, then two short bulleted lists (most likely, least likely) using the human label "attended X of Y past events".
+6. **Backend gap:** a batched \`get_category_return_likelihood(attendee_ids=[...])\` tool would cut N calls to 1. For now, use the per-attendee loop.
+
+### Session audience breakdown — "job titles per session" / "which roles attend which session" / "which categories attend which session"
+1. Resolve the dimension:
+   - If the user asks about **category** (VIP, Speaker, Cloud & Infrastructure, etc.) → use \`dimension="category"\`.
+   - Otherwise call \`list_attendee_fields\` to find the exact label for the requested attribute (Job Title, Company, Country, etc.) and use that as \`dimension\`.
+2. \`get_session_attendee_breakdown(dimension=<resolved>)\` — returns pre-aggregated (session, dimension value, attendee count) rows in a single call. Do NOT loop over sessions with \`get_session_attendees\`, and do NOT call \`list_attendees_with_custom_fields\` — those will blow the context window.
+3. Client-side: for each session, keep the top 5 dimension values by count and bucket the rest as "Other".
+
+**Required output structure — chart-first, minimal text. Do NOT add thematic groupings, per-group narratives, or concluding interpretation paragraphs.**
+
+\`\`\`
+[One sentence caption, max ~15 words. Example: "Job titles registered per session at Global Summit 2026."]
+
+[A \`xychart-beta\` horizontal bar chart, one bar per session (y-axis = session name, x-axis = attendee count). If the chart library can't stack, render one bar chart per top-5 dimension value as separate series. Chart title: "[Dimension] per session".]
+
+**Top patterns** (only if a genuine standout exists — skip this section otherwise):
+- One bullet, one sentence: e.g. "Senior Developer Advocates show up most in Cloud-Native & Platform Engineering (3)."
+- Maximum three bullets. Each bullet must name a specific session and specific value. No generalities like "technical sessions attract technical roles."
+\`\`\`
+
+**Forbidden:** do not group sessions by your own theme labels ("AI & Data Science Sessions", "Hardware & Innovation Sessions"). Do not write an introductory paragraph or a concluding paragraph. Do not describe what the chart shows in prose — the chart is the answer.
+
+### Session overlap with shared audience — "overlapping sessions" / "sessions at the same time with similar crowd"
+1. \`list_event_sessions()\` — get sessions with start/end times.
+2. Identify session pairs with overlapping or back-to-back (<15 min gap) time windows.
+3. For each overlapping pair, \`get_session_attendees\` for both, compute shared attendee count. If the user mentions "similar crowd" or "same audience", also aggregate by a relevant custom field (job title, company).
+4. Render as a \`gantt\` chart of the session schedule with overlapping pairs called out in prose below (e.g. "Workshop A and Panel 1 overlap from 10:00–10:30 and share 28 attendees, mostly Engineers and Product Managers").
+5. **Backend gap:** a \`get_session_schedule_conflicts()\` tool would make this a one-call pattern.`;
 
 export default content;

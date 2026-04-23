@@ -65,7 +65,7 @@ const PurePreviewMessage = ({
   );
 
   const isThinking = isAssistant && isLoading && !hasTextContent && !hasToolParts;
-  const isToolWorking = isAssistant && isLoading && !hasTextContent && hasToolParts;
+  const showStreamingIndicator = isAssistant && isLoading && !isThinking;
 
   const attachments = attachmentsFromMessage.length > 0 && (
     <div
@@ -331,13 +331,14 @@ const PurePreviewMessage = ({
       {parts}
       <div
         className={cn(
-          "flex h-[calc(13px*1.65)] items-center text-[13px] leading-[1.65]",
-          isToolWorking ? "opacity-100" : "hidden"
+          "flex items-center gap-1 py-1",
+          showStreamingIndicator ? "opacity-100" : "hidden"
         )}
+        aria-label="Assistant is responding"
       >
-        <Shimmer className="font-medium" duration={1}>
-          Working on it...
-        </Shimmer>
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
       </div>
       {actions}
     </>

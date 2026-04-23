@@ -67,11 +67,14 @@ export function createAttendeeTools(accountId: number, eventId: number) {
           fetchAll(
             `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus,
                     a.checkinAt, a.totalCost, a.balanceDue, a.category_id, a.subcategory_id,
-                    a.discountCode, a.personalNote, a.location, a.operator
+                    a.discountCode, a.personalNote, a.location, a.operator, ac.name AS category,
+                    asc2.name AS subcategory
              FROM Attendee a
              JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+             LEFT JOIN AttendeeCategory asc2 ON asc2.id = a.subcategory_id
              WHERE a.id = ? AND a.event_id = ? AND a.deleted = 0`,
-            [accountId, attendee_id, eventId],
+            [accountId, attendee_id, eventId]
           ),
           fetchAll(
             `SELECT afv.fieldName, afv.label, afv.responseValue
