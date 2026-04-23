@@ -34,6 +34,8 @@ Match the user's message here first — then jump directly to the pattern or too
 | "draft slack" / "slack message" / "slack update" / "post to slack" | → Pattern: **Slack draft** |
 | "draft email" / "write email" / "email for leadership" / "email update" | → Pattern: **Email draft** |
 | "whatsapp" / "whatsapp message" / "whatsapp update" | → Pattern: **WhatsApp draft** |
+| "[category] not arrived" / "[category] not checked in" / "who hasn't arrived from [category]" / "names of [category] not here yet" | → \`get_checkin_status_list(filter='not_checked_in', category=X)\` |
+| "[category] checked in" / "which [category] have arrived" | → \`get_checkin_status_list(filter='checked_in', category=X)\` |
 | "VIPs" / "speakers" / "board" / "sponsors" / any named category | → Pattern: **Category summary** |
 | "will [category/company] show up" / "how many from [X] will come" | → Pattern: **Category return likelihood** |
 | "job titles per session" / "which roles attend which session" | → Pattern: **Session audience breakdown** |
@@ -57,7 +59,7 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 | \`list_attendee_categories\` | "What attendee categories exist?" |
 | \`list_attendee_fields\` | Discover custom fields and exact labels — always call before filtering by a custom field |
 | \`get_event_overview\` | "How's the event?" / "Give me an overview" / "Event status" — full snapshot in one call; set \`include_sessions=true\` only if sessions are part of the question |
-| \`get_checkin_status_list\` | "Who has checked in?" / "Who hasn't checked in?" / both — pass \`filter='checked_in'\`, \`'not_checked_in'\`, or \`'both'\`. Always returns summary counts. When list exceeds 100 rows returns aggregate stats (category, mode, location, timeline for checked-in; category, registration/approval status for not-checked-in) instead of raw rows. For counts only, use \`get_category_breakdown\`. |
+| \`get_checkin_status_list\` | "Who has checked in?" / "Who hasn't checked in?" / "Names of VIPs not arrived" — pass \`filter\` and optionally \`category\` to scope to a specific group (e.g. \`category='VIP'\`). Always returns summary counts. When list exceeds 100 rows returns aggregate stats instead of raw rows. For counts only, use \`get_category_breakdown\`. |
 | \`check_attendee_status\` | "Has [name/email/barcode] checked in?" — fast single lookup, returns \`has_checked_in\` bool |
 | \`get_attendees_by_custom_field\` | Filter attendees by a custom field value — use exact label from \`list_attendee_fields\` first |
 | \`get_custom_field_distribution\` | "How many attendees from each country?" — grouped count of a custom field |
@@ -111,8 +113,9 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 1. \`check_attendee_status(q=name)\` — check \`has_checked_in\`
 2. If not checked in, also inspect \`registrationStatus\` — \`Attended\` means checked in regardless of \`checkinAt\`
 
-### "Who has NOT checked in?"
+### "Who has NOT checked in?" / "Names of [category] not arrived yet"
 1. \`get_checkin_status_list(filter='not_checked_in')\` — returns list or stats if > 100
+2. If a category is mentioned (e.g. "VIPs not arrived", "Board Members not checked in"): add \`category='VIP'\` — scopes the query and returns names directly since category lists are typically small
 
 ### "Show me attendees from [country/company/club]"
 1. \`list_attendee_fields()\` — find the exact label (e.g. "Home Country", "Company Name")
@@ -127,19 +130,15 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 - By registration status: \`get_registration_status_breakdown()\`
 
 ### "Tell me everything about attendee [name]"
-1. \`search_attendees(q=name)\` — get attendee ID
+1. \`search_attendees(q=name)\` — get attendee ID. If multiple matches, list names + emails and ask which one.
 2. \`get_attendee_full_profile(attendee_id=<id>)\` — core fields + all custom fields in one call
 
 ### "What is the check-in history for [attendee]?"
-1. \`search_attendees(q=name)\` — get attendee ID
+1. \`search_attendees(q=name)\` — get attendee ID. If multiple matches, list names + emails and ask which one.
 2. \`get_attendee_check_history(attendee_id=<id>)\` — full audit log
 
 ### "[name]'s journey" / "full journey" / "experience of [name]" / "timeline for [name]"
-1. \`search_attendees(q=name)\` — get attendee ID; if multiple matches, pick the closest name match and proceed — do NOT ask the user
-2. \`get_attendee_full_profile(attendee_id=<id>)\` — profile + all custom fields
-3. \`get_attendee_check_history(attendee_id=<id>)\` — full check-in/out timeline (run in parallel with step 2)
-4. Present as a combined narrative: profile summary first, then chronological check-in events
-5. Do NOT call \`list_attendees\`, \`list_attendees_with_custom_fields\`, or \`list_event_sessions\`
+→ Use the **Attendee journey** pattern below — it covers all steps including session registrations.
 
 ### "How full is session [name]?"
 1. \`list_event_sessions()\` — find session ID and \`maxPeople\`
@@ -189,11 +188,12 @@ Tools are pre-scoped to your event. Do not pass \`account_id\` or \`event_id\`.
 ---
 
 ### Attendee journey — "show [name]'s journey" / "story of [name]" / "full journey for [name]"
-1. \`search_attendees(q=name)\` — get attendee ID. If multiple matches, ask one clarifying question.
-2. \`get_attendee_full_profile(attendee_id=<id>)\` — profile + all custom fields in one call.
-3. \`get_attendee_check_history(attendee_id=<id>)\` — full check-in/out audit log.
-4. Resolve which sessions the attendee is registered for and which they attended (use \`get_session_attendees\` on relevant sessions, or a direct attendee-to-sessions tool if one exists).
-5. Render using **all three sections below, in this exact order, with these exact headings**. Do not merge sections or drop any. Do not add a chart — a single attendee's journey is a record, not an aggregation.
+1. \`search_attendees(q=name)\` — get attendee ID. If **1 match**: proceed immediately. If **multiple matches**: list their names and emails and ask "Which [name] did you mean?" — do not guess.
+2. In parallel, call both:
+   - \`get_attendee_full_profile(attendee_id=<id>)\` — profile + all custom fields
+   - \`get_attendee_check_history(attendee_id=<id>)\` — full check-in/out audit log
+3. To resolve session registrations: call \`list_event_sessions()\`, then call \`get_session_attendees\` **in parallel** for all sessions (not one-by-one). Filter the results to find rows where \`attendee_id\` matches this attendee. **Backend gap:** a \`get_attendee_sessions(attendee_id)\` tool would replace this loop — for now, run all \`get_session_attendees\` calls in a single parallel batch.
+4. Render using **all three sections below, in this exact order, with these exact headings**. Do not merge sections or drop any. Do not add a chart — a single attendee's journey is a record, not an aggregation.
 
 **Required output structure:**
 
