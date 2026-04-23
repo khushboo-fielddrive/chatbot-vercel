@@ -17,17 +17,18 @@ export function createDigestTools(accountId: number, eventId: number) {
       }),
       execute: async ({ vip_category_name }) => {
         const RISK_CHECKIN_RATE_THRESHOLD = 60;
+        const VIP_LIST_THRESHOLD = 50;
         const vipLike = `%${vip_category_name}%`;
 
+        // ── Phase 1: always-needed aggregates + counts for conditional queries ──
         const [
           [overallRows],
           [lastHourRows],
           [prevHourRows],
           categoryRows,
           checkinModeRows,
-          operatorRows,
-          vipCheckedInRows,
-          vipMissingRows,
+          [vipCountRows],
+          [operatorComboCountRows],
           sessionRows,
           historicalRows,
         ] = await Promise.all([
@@ -93,47 +94,32 @@ export function createDigestTools(accountId: number, eventId: number) {
             [accountId, eventId],
           ),
 
-          // 6. Top operators / locations (kiosk activity)
-          fetchAll(
+          // 6. VIP counts (checked-in vs missing) — used to decide list vs stats
+          eventPool.query(
             `SELECT
-               COALESCE(NULLIF(TRIM(a.location), ''), 'unknown') AS location,
-               COALESCE(NULLIF(TRIM(a.operator), ''), 'unknown') AS operator,
-               COUNT(*) AS checkins
+               SUM(a.checkinAt IS NOT NULL) AS vip_checked_in,
+               SUM(a.checkinAt IS NULL)     AS vip_missing
              FROM Attendee a
              JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
-             WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
-             GROUP BY location, operator
-             ORDER BY checkins DESC`,
+             LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+             WHERE a.event_id = ? AND a.deleted = 0 AND ac.name LIKE ?`,
+            [accountId, eventId, vipLike],
+          ) as Promise<[any[], any]>,
+
+          // 7. Operator/location combo count — used to decide list vs stats
+          eventPool.query(
+            `SELECT COUNT(*) AS combo_count FROM (
+               SELECT 1
+               FROM Attendee a
+               JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+               WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+               GROUP BY COALESCE(NULLIF(TRIM(a.location), ''), 'unknown'),
+                        COALESCE(NULLIF(TRIM(a.operator), ''), 'unknown')
+             ) AS combos`,
             [accountId, eventId],
-          ),
+          ) as Promise<[any[], any]>,
 
-          // 7. VIPs who have checked in (sample)
-          fetchAll(
-            `SELECT a.name, a.email, a.checkinAt, a.location, a.operator
-             FROM Attendee a
-             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
-             LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
-             WHERE a.event_id = ? AND a.deleted = 0
-               AND ac.name LIKE ?
-               AND a.checkinAt IS NOT NULL
-             ORDER BY a.checkinAt DESC`,
-            [accountId, eventId, vipLike],
-          ),
-
-          // 8. VIPs not yet checked in
-          fetchAll(
-            `SELECT a.name, a.email, a.registrationStatus
-             FROM Attendee a
-             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
-             LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
-             WHERE a.event_id = ? AND a.deleted = 0
-               AND ac.name LIKE ?
-               AND a.checkinAt IS NULL
-             ORDER BY a.name`,
-            [accountId, eventId, vipLike],
-          ),
-
-          // 9. Session capacity alerts (sessions ≥ 80% full)
+          // 8. Session capacity alerts (sessions ≥ 80% full)
           fetchAll(
             `SELECT es.name AS session,
                     es.maxPeople AS capacity,
@@ -151,7 +137,7 @@ export function createDigestTools(accountId: number, eventId: number) {
             [accountId, eventId],
           ),
 
-          // 10. Historical overall check-in rate for this account
+          // 9. Historical overall check-in rate for this account
           eventPool.query(
             `SELECT ROUND(SUM(a.checkinAt IS NOT NULL) / NULLIF(COUNT(a.id), 0) * 100, 1) AS hist_rate_pct
              FROM Attendee a
@@ -159,6 +145,154 @@ export function createDigestTools(accountId: number, eventId: number) {
              WHERE e.account_id = ? AND a.deleted = 0 AND e.deleted = 0 AND e.id != ?`,
             [accountId, eventId],
           ) as Promise<[any[], any]>,
+        ]);
+
+        const vipCheckedInCount = Number(vipCountRows[0]?.vip_checked_in ?? 0);
+        const vipMissingCount = Number(vipCountRows[0]?.vip_missing ?? 0);
+        const operatorComboCount = Number(operatorComboCountRows[0]?.combo_count ?? 0);
+
+        // ── Phase 2: conditional queries based on thresholds ──────────────
+        const [kioskStatus, vipCheckedInData, vipMissingData] = await Promise.all([
+
+          // Query 6: operator/location — list if ≤50 combos, per-location + per-operator stats if >50
+          operatorComboCount <= VIP_LIST_THRESHOLD
+            ? fetchAll(
+                `SELECT
+                   COALESCE(NULLIF(TRIM(a.location), ''), 'unknown') AS location,
+                   COALESCE(NULLIF(TRIM(a.operator), ''), 'unknown') AS operator,
+                   COUNT(*) AS checkins
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                 GROUP BY location, operator
+                 ORDER BY checkins DESC`,
+                [accountId, eventId],
+              ).then((rows) => ({ stats_only: false, data: rows }))
+            : Promise.all([
+                fetchAll(
+                  `SELECT
+                     COALESCE(NULLIF(TRIM(a.location), ''), 'unknown') AS location,
+                     COUNT(*) AS checkins
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                   GROUP BY location ORDER BY checkins DESC`,
+                  [accountId, eventId],
+                ),
+                fetchAll(
+                  `SELECT
+                     COALESCE(NULLIF(TRIM(a.operator), ''), 'unknown') AS operator,
+                     COUNT(*) AS checkins
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+                   GROUP BY operator ORDER BY checkins DESC`,
+                  [accountId, eventId],
+                ),
+              ]).then(([locationRows, operatorRows]) => ({
+                stats_only: true,
+                combo_count: operatorComboCount,
+                by_location: locationRows,   // chart: bar — location vs checkins
+                by_operator: operatorRows,   // chart: bar — operator vs checkins
+              })),
+
+          // Query 7: VIPs checked in — list if ≤50, hourly timeline + location breakdown if >50
+          vipCheckedInCount <= VIP_LIST_THRESHOLD
+            ? fetchAll(
+                `SELECT a.name, a.email, a.checkinAt, a.location, a.operator
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                 WHERE a.event_id = ? AND a.deleted = 0
+                   AND ac.name LIKE ? AND a.checkinAt IS NOT NULL
+                 ORDER BY a.checkinAt DESC`,
+                [accountId, eventId, vipLike],
+              ).then((rows) => ({ stats_only: false, count: vipCheckedInCount, data: rows }))
+            : Promise.all([
+                fetchAll(
+                  `SELECT
+                     DATE_FORMAT(
+                       FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(a.checkinAt) / 3600) * 3600),
+                       '%Y-%m-%d %H:%i'
+                     ) AS hour_slot,
+                     COUNT(*) AS checkins
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                   WHERE a.event_id = ? AND a.deleted = 0
+                     AND ac.name LIKE ? AND a.checkinAt IS NOT NULL
+                   GROUP BY hour_slot ORDER BY hour_slot`,
+                  [accountId, eventId, vipLike],
+                ),
+                fetchAll(
+                  `SELECT
+                     COALESCE(NULLIF(TRIM(a.location), ''), 'unknown') AS location,
+                     COUNT(*) AS checkins
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                   WHERE a.event_id = ? AND a.deleted = 0
+                     AND ac.name LIKE ? AND a.checkinAt IS NOT NULL
+                   GROUP BY location ORDER BY checkins DESC`,
+                  [accountId, eventId, vipLike],
+                ),
+              ]).then(([timelineRows, locationRows]) => ({
+                stats_only: true,
+                count: vipCheckedInCount,
+                hourly_timeline: timelineRows,   // chart: xychart-beta line — VIP arrivals per hour
+                by_location: locationRows,        // chart: bar — where VIPs checked in
+              })),
+
+          // Query 8: VIPs missing — list if ≤50, registration/approval breakdown + top 10 sample if >50
+          vipMissingCount <= VIP_LIST_THRESHOLD
+            ? fetchAll(
+                `SELECT a.name, a.email, a.registrationStatus
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                 WHERE a.event_id = ? AND a.deleted = 0
+                   AND ac.name LIKE ? AND a.checkinAt IS NULL
+                 ORDER BY a.name`,
+                [accountId, eventId, vipLike],
+              ).then((rows) => ({ stats_only: false, count: vipMissingCount, data: rows }))
+            : Promise.all([
+                fetchAll(
+                  `SELECT a.registrationStatus AS status, COUNT(*) AS count
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                   WHERE a.event_id = ? AND a.deleted = 0
+                     AND ac.name LIKE ? AND a.checkinAt IS NULL
+                   GROUP BY a.registrationStatus ORDER BY count DESC`,
+                  [accountId, eventId, vipLike],
+                ),
+                fetchAll(
+                  `SELECT a.approvalStatus AS status, COUNT(*) AS count
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                   WHERE a.event_id = ? AND a.deleted = 0
+                     AND ac.name LIKE ? AND a.checkinAt IS NULL
+                   GROUP BY a.approvalStatus ORDER BY count DESC`,
+                  [accountId, eventId, vipLike],
+                ),
+                fetchAll(
+                  `SELECT a.name, a.email, a.registrationStatus
+                   FROM Attendee a
+                   JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                   LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
+                   WHERE a.event_id = ? AND a.deleted = 0
+                     AND ac.name LIKE ? AND a.checkinAt IS NULL
+                   ORDER BY a.name LIMIT 10`,
+                  [accountId, eventId, vipLike],
+                ),
+              ]).then(([regRows, approvalRows, sampleRows]) => ({
+                stats_only: true,
+                count: vipMissingCount,
+                registration_status: regRows,   // chart: pie/bar — why VIPs haven't arrived
+                approval_status: approvalRows,
+                sample_top10: sampleRows,        // first 10 alphabetically for quick reference
+              })),
         ]);
 
         // ── Assemble summary ──────────────────────────────────────────────
@@ -192,10 +326,8 @@ export function createDigestTools(accountId: number, eventId: number) {
             `Check-in velocity has dropped sharply: ${lastHour} in the last hour vs ${prevHour} in the prior hour.`,
           );
         }
-        if (vipMissingRows.length > 0) {
-          risks.push(
-            `${vipMissingRows.length} ${vip_category_name}(s) have not yet checked in.`,
-          );
+        if (vipMissingCount > 0) {
+          risks.push(`${vipMissingCount} ${vip_category_name}(s) have not yet checked in.`);
         }
         if (sessionRows.length > 0) {
           const fullSessions = sessionRows.filter((s: any) => Number(s.fill_pct) >= 100);
@@ -230,14 +362,11 @@ export function createDigestTools(accountId: number, eventId: number) {
               trend: velocityTrend,
             },
             category_breakdown: categoryRows,
-            kiosk_status: {
-              mode_split: checkinModeRows,
-              top_locations_operators: operatorRows,
-            },
+            kiosk_status: { mode_split: checkinModeRows, ...kioskStatus },
             vip_highlights: {
               category_used: vip_category_name,
-              checked_in_sample: vipCheckedInRows,
-              not_yet_arrived_sample: vipMissingRows,
+              checked_in: vipCheckedInData,
+              not_yet_arrived: vipMissingData,
             },
             session_capacity_alerts: sessionRows,
             risks,
