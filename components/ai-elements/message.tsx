@@ -318,8 +318,6 @@ export const MessageBranchPage = ({
   );
 };
 
-export type MessageResponseProps = ComponentProps<typeof Streamdown>;
-
 const mermaid = createMermaidPlugin({
   config: {
     theme: "base",
@@ -357,19 +355,43 @@ const mermaid = createMermaidPlugin({
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
+const MermaidLoadingFallback = () => (
+  <div className="flex min-h-[160px] items-center justify-center gap-2 rounded-md border border-border/50 bg-muted/40 px-4 py-6 text-muted-foreground text-xs">
+    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+    <span className="ml-2">Rendering chart…</span>
+  </div>
+);
+
+const MermaidErrorFallback = () => (
+  <div className="flex min-h-[120px] items-center justify-center rounded-md border border-border/50 bg-muted/30 px-4 py-6 text-muted-foreground text-xs">
+    Chart couldn't render.
+  </div>
+);
+
+const streamingMermaidOptions = { errorComponent: MermaidLoadingFallback };
+const idleMermaidOptions = { errorComponent: MermaidErrorFallback };
+
+export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
+  isStreaming?: boolean;
+};
+
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
+  ({ className, isStreaming, ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className
       )}
+      mermaid={isStreaming ? streamingMermaidOptions : idleMermaidOptions}
       plugins={streamdownPlugins}
-      controls={{ mermaid: { panZoom: false } }}
       {...props}
     />
   ),
-  (prevProps, nextProps) => prevProps.children === nextProps.children
+  (prevProps, nextProps) =>
+    prevProps.children === nextProps.children &&
+    prevProps.isStreaming === nextProps.isStreaming
 );
 
 MessageResponse.displayName = "MessageResponse";
