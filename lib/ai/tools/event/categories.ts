@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { query } from "@/lib/db/event-db";
 
-export function createCategoryTools(eventId: number) {
+export function createCategoryTools(accountId: number, eventId: number) {
   return {
     list_attendee_categories: tool({
       description:
@@ -10,10 +10,11 @@ export function createCategoryTools(eventId: number) {
       inputSchema: z.object({}),
       execute: async () =>
         query(
-          `SELECT id, name, thirdPartyId, category_id
-           FROM AttendeeCategory
-           WHERE event_id = ? AND deleted = 0`,
-          [eventId],
+          `SELECT ac.id, ac.name, ac.thirdPartyId, ac.category_id
+           FROM AttendeeCategory ac
+           JOIN Event e ON e.id = ac.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE ac.event_id = ? AND ac.deleted = 0`,
+          [accountId, eventId],
         ),
     }),
   };

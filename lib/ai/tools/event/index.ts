@@ -6,6 +6,8 @@ import { createAccountInsightTools } from "./account-insights";
 import { createAttendeeTools } from "./attendees";
 import { createCategoryTools } from "./categories";
 import { createCheckHistoryTools } from "./check-history";
+import { createDigestTools } from "./digest";
+import { createPredictionTools } from "./predictions";
 import { createSessionTools } from "./sessions";
 import { createStatsTools } from "./stats";
 
@@ -20,11 +22,13 @@ export function createEventTools(ctx: EventContext) {
     }),
     ...createAccountTools(accountId),
     ...createAccountInsightTools(accountId, eventId),
-    ...createAttendeeTools(eventId),
-    ...createCategoryTools(eventId),
-    ...createCheckHistoryTools(eventId),
-    ...createSessionTools(eventId),
-    ...createStatsTools(eventId),
+    ...createPredictionTools(accountId, eventId),
+    ...createDigestTools(accountId, eventId),
+    ...createAttendeeTools(accountId, eventId),
+    ...createCategoryTools(accountId, eventId),
+    ...createCheckHistoryTools(accountId, eventId),
+    ...createSessionTools(accountId, eventId),
+    ...createStatsTools(accountId, eventId),
   };
 }
 

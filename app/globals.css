@@ -499,12 +499,11 @@ textarea:focus-visible {
   isolation: isolate;
 }
 
-/* Mermaid diagram styling — reduce white space, fill chat width */
+/* Mermaid diagram styling — fill chat width, no forced whitespace */
 [data-language="mermaid"] {
   display: block !important;
   width: 100% !important;
   max-width: 100%;
-  min-height: 320px;
 }
 
 /* Hide the "mermaid" text but keep the header bar for action buttons layout */
@@ -516,8 +515,15 @@ textarea:focus-visible {
 
 [data-language="mermaid"] svg {
   width: 100% !important;
-  min-height: 320px;
+  max-width: 100% !important;
   height: auto !important;
+  max-height: 480px;
   margin: 0 auto;
   display: block;
+}
+
+/* Pie chart legend uses currentColor — readable in both light and dark mode */
+[data-language="mermaid"] .pieLegend text,
+[data-language="mermaid"] .legend text {
+  fill: currentColor !important;
 }

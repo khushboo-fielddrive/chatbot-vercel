@@ -1,23 +1,38 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { fetchAll, query } from "@/lib/db/event-db";
+import { eventPool, fetchAll, query } from "@/lib/db/event-db";
 
-export function createAttendeeTools(eventId: number) {
+export function createAttendeeTools(accountId: number, eventId: number) {
   return {
     list_attendees: tool({
       description:
-        "List all attendees for the event (standard fields: name, email, barcode, registrationStatus, checkinAt). Does NOT include custom field values — use list_attendees_with_custom_fields if you need those. Do NOT use for counts — use get_category_breakdown or get_custom_field_distribution instead.",
+        "List all attendees for the event (standard fields only: name, email, barcode, registrationStatus, checkinAt). Do NOT call this if you need custom field values — call list_attendees_with_custom_fields directly instead. Do NOT use for counts — use get_category_breakdown or get_custom_field_distribution instead.",
       inputSchema: z.object({}),
       execute: async () => {
+        const [[countRow]] = await eventPool.query(
+          `SELECT COUNT(*) AS total FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0`,
+          [accountId, eventId],
+        ) as [any[], any];
+        const total = Number(countRow.total);
+        if (total > 100) {
+          return JSON.stringify({
+            total,
+            data: [],
+            message: `${total} attendees found — too many to list. Use search_attendees to filter by name/email, or get_category_breakdown for counts.`,
+          }, null, 2);
+        }
         const rows = await fetchAll(
-          `SELECT id, name, email, barcode, registrationStatus, approvalStatus,
-                  checkinAt, totalCost, balanceDue, category_id
-           FROM Attendee
-           WHERE event_id = ? AND deleted = 0
-           ORDER BY name`,
-          [eventId],
+          `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus,
+                  a.checkinAt, a.totalCost, a.balanceDue, a.category_id
+           FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0
+           ORDER BY a.name`,
+          [accountId, eventId],
         );
-        return JSON.stringify(rows, null, 2);
+        return JSON.stringify({ total, data: rows }, null, 2);
       },
     }),
 
@@ -29,12 +44,13 @@ export function createAttendeeTools(eventId: number) {
       execute: async ({ q }) => {
         const like = `%${q}%`;
         const rows = await fetchAll(
-          `SELECT id, name, email, barcode, registrationStatus, checkinAt
-           FROM Attendee
-           WHERE event_id = ? AND deleted = 0
-             AND (name LIKE ? OR email LIKE ? OR barcode LIKE ?)
-           ORDER BY name`,
-          [eventId, like, like, like],
+          `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.checkinAt
+           FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0
+             AND (a.name LIKE ? OR a.email LIKE ? OR a.barcode LIKE ?)
+           ORDER BY a.name`,
+          [accountId, eventId, like, like, like],
         );
         return JSON.stringify(rows, null, 2);
       },
@@ -50,22 +66,24 @@ export function createAttendeeTools(eventId: number) {
         const [attendeeRows, fieldRows] = await Promise.all([
           fetchAll(
             `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus,
-                    a.checkinAt, a.totalCost, a.balanceDue, a.category_id, ac.name AS category,
-                    a.subcategory_id, asc2.name AS subcategory,
-                    a.discountCode, a.personalNote, a.location, a.operator
+                    a.checkinAt, a.totalCost, a.balanceDue, a.category_id, a.subcategory_id,
+                    a.discountCode, a.personalNote, a.location, a.operator, ac.name AS category,
+                    asc2.name AS subcategory
              FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
              LEFT JOIN AttendeeCategory ac ON ac.id = a.category_id
              LEFT JOIN AttendeeCategory asc2 ON asc2.id = a.subcategory_id
              WHERE a.id = ? AND a.event_id = ? AND a.deleted = 0`,
-            [attendee_id, eventId],
+            [accountId, attendee_id, eventId]
           ),
           fetchAll(
             `SELECT afv.fieldName, afv.label, afv.responseValue
              FROM AttendeeFieldValue afv
              JOIN Attendee a ON a.id = afv.ATTENDEE_ID
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
              WHERE afv.ATTENDEE_ID = ? AND a.event_id = ? AND a.deleted = 0
              ORDER BY afv.field_id`,
-            [attendee_id, eventId],
+            [accountId, attendee_id, eventId],
           ),
         ]);
         return JSON.stringify(
@@ -82,35 +100,61 @@ export function createAttendeeTools(eventId: number) {
       inputSchema: z.object({}),
       execute: async () =>
         query(
-          `SELECT id, fieldName, label, dataType, typeLabel, required, visible, thirdPartyId
-           FROM AttendeeField
-           WHERE event_id = ? AND deleted = 0
-           ORDER BY id`,
-          [eventId],
+          `SELECT af.id, af.fieldName, af.label, af.dataType, af.typeLabel, af.required, af.visible, af.thirdPartyId
+           FROM AttendeeField af
+           JOIN Event e ON e.id = af.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE af.event_id = ? AND af.deleted = 0
+           ORDER BY af.id`,
+          [accountId, eventId],
         ),
     }),
 
     list_attendees_with_custom_fields: tool({
       description:
-        "Returns all attendees with standard fields AND all custom field values merged. Prefer this over list_attendees when custom field data is needed.",
-      inputSchema: z.object({}),
-      execute: async () => {
+        "Returns all attendees with standard fields AND custom field values merged. Do NOT call this if the question only needs standard fields (name, email, barcode, status) — use list_attendees instead. Use field_label_filter to fetch only specific fields (e.g. 'company', 'country') — always prefer filtering over fetching all fields to reduce response size.",
+      inputSchema: z.object({
+        field_label_filter: z
+          .string()
+          .optional()
+          .describe(
+            "Optional LIKE filter on custom field labels (e.g. 'company' returns fields whose label contains 'company'). Leave empty to return all custom fields.",
+          ),
+      }),
+      execute: async ({ field_label_filter }) => {
+        const [[countRow]] = await eventPool.query(
+          `SELECT COUNT(*) AS total FROM Attendee a
+           JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+           WHERE a.event_id = ? AND a.deleted = 0`,
+          [accountId, eventId],
+        ) as [any[], any];
+        const total = Number(countRow.total);
+        if (total > 100) {
+          return JSON.stringify({
+            total,
+            data: [],
+            message: `${total} attendees found — too many to list with custom fields. Use get_attendees_by_custom_field to filter by a specific field value, or get_custom_field_distribution for counts.`,
+          }, null, 2);
+        }
+        const fieldLabelFilter = field_label_filter ? `%${field_label_filter}%` : "%";
         const [attendees, fieldRows] = await Promise.all([
           fetchAll(
-            `SELECT id, name, email, barcode, registrationStatus, approvalStatus,
-                    checkinAt, totalCost, balanceDue, category_id
-             FROM Attendee
-             WHERE event_id = ? AND deleted = 0
-             ORDER BY name`,
-            [eventId],
+            `SELECT a.id, a.name, a.email, a.barcode, a.registrationStatus, a.approvalStatus,
+                    a.checkinAt, a.totalCost, a.balanceDue, a.category_id
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0
+             ORDER BY a.name`,
+            [accountId, eventId],
           ),
           fetchAll(
             `SELECT afv.ATTENDEE_ID, afv.label, afv.responseValue
              FROM AttendeeFieldValue afv
              JOIN Attendee a ON a.id = afv.ATTENDEE_ID
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
              WHERE a.event_id = ? AND a.deleted = 0
+               AND afv.label LIKE ?
              ORDER BY afv.ATTENDEE_ID, afv.field_id`,
-            [eventId],
+            [accountId, eventId, fieldLabelFilter],
           ),
         ]);
 
@@ -122,7 +166,7 @@ export function createAttendeeTools(eventId: number) {
         }
 
         return JSON.stringify(
-          attendees.map((a: any) => ({ ...a, customFields: fieldsByAttendee.get(a.id) ?? {} })),
+          { total, data: attendees.map((a: any) => ({ ...a, customFields: fieldsByAttendee.get(a.id) ?? {} })) },
           null,
           2,
         );
