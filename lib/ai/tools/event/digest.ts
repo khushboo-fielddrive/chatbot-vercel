@@ -326,9 +326,45 @@ export function createDigestTools(accountId: number, eventId: number) {
             `Check-in velocity has dropped sharply: ${lastHour} in the last hour vs ${prevHour} in the prior hour.`,
           );
         }
+
+        // VIP missing — include names if list is available
         if (vipMissingCount > 0) {
-          risks.push(`${vipMissingCount} ${vip_category_name}(s) have not yet checked in.`);
+          const missingNames =
+            !vipMissingData.stats_only && Array.isArray((vipMissingData as any).data)
+              ? (vipMissingData as any).data.map((v: any) => v.name).join(", ")
+              : (vipMissingData as any).sample_top10?.map((v: any) => v.name).join(", ") ?? "";
+          risks.push(
+            `${vipMissingCount} ${vip_category_name}(s) not yet checked in${missingNames ? `: ${missingNames}` : ""}.`,
+          );
         }
+
+        // Board member missing — derive from categoryRows
+        const boardCategories = categoryRows.filter((r: any) =>
+          r.category?.toLowerCase().includes("board"),
+        );
+        const boardMissing = boardCategories.reduce(
+          (sum: number, r: any) => sum + (Number(r.registered) - Number(r.checked_in)),
+          0,
+        );
+        if (boardMissing > 0) {
+          risks.push(
+            `${boardMissing} Board Member(s) not yet checked in — flag for immediate follow-up.`,
+          );
+        }
+
+        // Staff below 100% — derive from categoryRows
+        const staffCategories = categoryRows.filter((r: any) =>
+          r.category?.toLowerCase().includes("staff"),
+        );
+        for (const sc of staffCategories) {
+          const staffMissing = Number(sc.registered) - Number(sc.checked_in);
+          if (staffMissing > 0) {
+            risks.push(
+              `Staff check-in at ${sc.checkin_pct}% — ${staffMissing} staff member(s) not yet checked in.`,
+            );
+          }
+        }
+
         if (sessionRows.length > 0) {
           const fullSessions = sessionRows.filter((s: any) => Number(s.fill_pct) >= 100);
           const nearlySessions = sessionRows.filter(

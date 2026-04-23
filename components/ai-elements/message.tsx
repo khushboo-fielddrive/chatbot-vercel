@@ -324,6 +324,7 @@ const mermaid = createMermaidPlugin({
   config: {
     theme: "base",
     fontFamily: "var(--font-geist), Geist, sans-serif",
+    fontSize: 13,
     themeVariables: {
       primaryColor: "#4f46e5",
       primaryTextColor: "#ffffff",
@@ -335,7 +336,7 @@ const mermaid = createMermaidPlugin({
       tertiaryTextColor: "#1f2937",
       tertiaryBorderColor: "#d97706",
       pieSectionTextColor: "#ffffff",
-      pieLegendTextColor: "#374151",
+      pieLegendTextColor: "currentColor",
       pieStrokeColor: "#ffffff",
       pieStrokeWidth: "2px",
       pie1: "#4f46e5",
@@ -364,6 +365,7 @@ export const MessageResponse = memo(
         className
       )}
       plugins={streamdownPlugins}
+      controls={{ mermaid: { panZoom: false } }}
       {...props}
     />
   ),

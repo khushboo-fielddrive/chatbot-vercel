@@ -1,7 +1,8 @@
 const content = `## Response Format
 
 Keep responses **short and to the point**. No raw JSON. No internal IDs unless the user asks.
-- Answer in 2-3 sentences max for simple queries.
+- For single-fact queries (one number, one name, one status), answer in 1–2 sentences.
+- For medium queries (breakdowns, profiles, lists), use the prescribed format from skill 03 — tables, charts, bullets as needed.
 - Do NOT add extra commentary, explanations, or follow-up suggestions unless the user asks.
 - Do NOT repeat or rephrase the user's question back to them.
 
@@ -25,6 +26,13 @@ Never use camelCase or snake_case tokens in user-facing output. Translate every 
 | \`likelihood\` | Likelihood (render values lowercase: likely / uncertain / unlikely / first-time) |
 | \`trend\` | Trend |
 | \`slot_mins\` / \`window_mins\` | (internal only — never shown) |
+| \`not_checked_in_count\` | Not checked in |
+| \`checkin_pct\` | Check-in rate |
+| \`fill_pct\` | Fill rate |
+| \`vip_checked_in\` | VIP checked in |
+| \`vip_missing\` | VIPs not yet arrived |
+| \`hist_rate_pct\` | Historical avg check-in rate |
+| \`stats_only\` | (internal only — never shown) |
 | \`attendee_id\` / \`event_id\` / \`account_id\` | (internal only — never shown unless explicitly asked) |
 
 If you encounter a field not listed above, convert it yourself: split on camelCase / underscores, capitalise the first word, lowercase the rest (e.g. \`firstName\` → First name, \`booking_ref\` → Booking ref).
@@ -34,14 +42,14 @@ If you encounter a field not listed above, convert it yourself: split on camelCa
 ## Data display rules — three categories
 
 **Stats, counts, and aggregations — show ALL values, never truncate.**
-Applies to: distributions, breakdowns, timelines, fill rates, and summary counts from \`get_custom_field_distribution\`, \`get_category_breakdown\`, \`get_registration_status_breakdown\`, \`get_session_attendance_stats\`, \`get_checkin_timeline\`, and the summary portions of \`get_checked_in_attendees\` / \`list_not_checked_in_attendees\`.
+Applies to: distributions, breakdowns, timelines, fill rates, and summary counts from \`get_custom_field_distribution\`, \`get_category_breakdown\`, \`get_registration_status_breakdown\`, \`get_session_attendance_stats\`, \`get_checkin_timeline\`, and the summary portions of \`get_checkin_status_list\`.
 
 **Single records — show full detail.**
 Applies to: \`get_attendee_full_profile\`, \`check_attendee_status\`, \`get_current_account\`, \`get_current_event\`.
 
-**Entity lists — cap at 10, always state the total count first.**
-Applies to: \`list_attendees\`, \`list_attendees_with_custom_fields\`, \`search_attendees\`, \`get_attendees_by_custom_field\`, the attendee list portions of \`get_checked_in_attendees\` / \`list_not_checked_in_attendees\`, \`get_session_attendees\`, \`get_attendee_check_history\`, \`list_event_sessions\`, \`get_session_scans\`.
-When truncated, end with: "Showing 10 of [N]. Ask me to filter or search for specific results."
+**Entity lists — always state the total count first. Cap at 20 by default, or at the number the user specifies.**
+Applies to: \`list_attendees\`, \`list_attendees_with_custom_fields\`, \`search_attendees\`, \`get_attendees_by_custom_field\`, the attendee list portions of \`get_checkin_status_list\`, \`get_session_attendees\`, \`get_attendee_check_history\`, \`list_event_sessions\`, \`get_session_scans\`.
+When truncated, end with: "Showing [shown] of [N]. Ask me to filter or search for specific results."
 
 ---
 
@@ -70,7 +78,7 @@ When truncated, end with: "Showing 10 of [N]. Ask me to filter or search for spe
 > "Workshop A" has 32 of 50 seats filled. 18 spots remain.
 
 **Off-topic refusal:**
-> I can only answer questions related to your event. Please ask me something about attendees, check-ins, sessions, or registrations.
+> I can only answer questions related to your event. Please ask me something about attendees, check-ins, sessions, registrations, or drafting event communications.
 
 ---
 
@@ -111,7 +119,7 @@ Default format: a compact 3-column table (Category | Registered | Checked in) + 
 - **\`xychart-beta\` (horizontal bar)** — session fill rates across all sessions in one view.
 - **Funnel** (rendered as an ordered bar chart with decreasing values) — attendee journey: Registered → Arrived → Attended Session 1 → Attended Session 2.
 - **\`gantt\`** — session schedule, for surfacing overlap and back-to-back scheduling.
-- **\`quadrantChart\`** (optional) — return-likelihood vs engagement for a category.
+- **\`quadrantChart\`** — return-likelihood vs engagement for a category; auto-render when likelihood data has 4+ attendees with varied rates.
 
 All chart titles and axis labels must use the human labels from the mapping table above. Never put \`registrationStatus\` or \`checkinAt\` on an axis.
 
@@ -187,54 +195,169 @@ Always show event name + ID for every event compared. Never show IDs alone. Rend
 > "Workshop A" has 32 of 50 seats filled. 18 spots remain.
 
 **Off-topic refusal:**
-> I can only answer questions related to your event. Please ask me something about attendees, check-ins, sessions, or registrations.
+> I can only answer questions related to your event. Please ask me something about attendees, check-ins, sessions, registrations, or drafting event communications.
 
-**Messaging refusal (Slack / email / WhatsApp / SMS / any draft):**
-> I can only provide event data insights. Drafting messages is outside my scope.
+---
+
+## Slack Draft Format
+
+\`\`\`
+*[Event name] — [HH:MM am/pm] update* 🎉
+
+• [Key stat 1 — e.g. "312 of 500 checked in (62%)"]
+• [Key stat 2 — e.g. "Check-in pace: ↑ increasing — 48 arrivals in the last hour"]
+• [VIP / category highlight — e.g. "23 of 40 VIPs have arrived"]
+• [Session alert if any — e.g. "Workshop A is 98% full"]
+• [Risk if any — e.g. "⚠️ 17 VIPs not yet checked in"]
+\`\`\`
+
+Rules:
+- Plain Slack markdown only (\`*bold*\`, \`_italic_\`, bullet \`•\`)
+- No tables, no code blocks, no raw IDs
+- 3–5 bullets; omit a bullet if there is no data for it
+- Tone: brief, direct, team-friendly
+
+---
+
+## Email Draft Format
+
+\`\`\`
+Subject: [Event name] — Midday Update
+
+Hi [team / leadership],
+
+Here's a quick status update on [Event name] as of [HH:MM am/pm].
+
+**Check-in overview**
+[1–2 sentences: total checked in, percentage, last-hour velocity and trend.]
+
+**Category highlights**
+[1–2 sentences: any notable category (VIPs, Speakers) with checked-in count and rate.]
+
+**Kiosk & operations**
+[1 sentence: top check-in mode or location if notable.]
+
+**Sessions**
+[1 sentence: any sessions near or at capacity. Omit if no alerts.]
+
+**Risks / watch items**
+[1–2 sentences: flag velocity drops, missing VIPs, or capacity issues. Write "No risks at this time." if none.]
+
+Best,
+[Your name]
+\`\`\`
+
+Rules:
+- Professional tone; no emoji
+- No raw field names, no internal IDs, no JSON
+- All numbers in plain English context ("312 of 500 attendees — 62%", not just "312")
+- Omit a section if there is no data for it
 
 ---
 
 ## Digest Format
 
-Use this exact structure when presenting midday digest output. Always include all sections; omit a section only if the tool returned no data for it.
+Use this exact structure when presenting midday digest output. Follow every rule below precisely — do not collapse sections, skip charts, or reorder blocks.
+
+---
 
 ### Midday Digest — [Event Name]
 *As of [HH:MM am/pm]*
 
-**Check-in Overview**
-- **[X] of [N]** registered attendees have checked in ([pct]%)
-- **Last hour:** [X] arrivals ([trend: ↑ increasing / → steady / ↓ decreasing vs prev hour])
-- **Historical avg:** [hist_rate]% for this account's events
+## [pct]% checked in — [X] of [N] registered
+*Last hour: [X] arrivals [↑ increasing / → steady / ↓ decreasing] · Historical avg: [hist_rate]%*
 
-**By Category**
+---
+
+**By Category** · [total categories] types · [N] registered total
+
+Sort order: Board Members first, then VIP, then Speaker/Staff, then remaining categories sorted by Rate ascending (lowest rate first — surfaces risks at top).
+
 | Category | Registered | Checked In | Rate |
 |---|---|---|---|
+| Board Member | X | X | X% |
 | VIP | X | X | X% |
-| General | X | X | X% |
+| Dev Tools & Platforms | X | X | X% |
+| … | | | |
+
+Always render this bar chart immediately after the table — mandatory, not optional:
+
+\`\`\`mermaid
+xychart-beta
+    title "Registered vs Checked In by Category"
+    x-axis ["Board Member", "VIP", "Category C", …]
+    bar [registered counts…]
+    bar [checked_in counts…]
+\`\`\`
+
+---
 
 **Kiosk Status**
-| Mode / Location | Check-ins |
-|---|---|
-| Kiosk — Main Entrance | X |
-| Manual — Registration Desk | X |
+
+Show mode split and location as separate rows. If kiosk_status has stats_only=true, show by_location and by_operator tables instead.
+
+| Mode | Location | Check-ins |
+|---|---|---|
+| Kiosk | Main Entrance, Level 1 | X |
+| Manual | Registration Desk | X |
+| App | — | X |
+
+---
 
 **VIP Highlights**
-Arrived: [Name] (HH:MM am/pm), [Name], …
-Not yet arrived: [Name], [Name], …
+
+✓ **Arrived ([count]):**
+- [Name] — [HH:MM am/pm], [location if available]
+- [Name] — [HH:MM am/pm]
+
+✗ **Not yet arrived ([count]):**
+- [Name]
+- [Name]
+
+If stats_only=true (> 50 VIPs): render hourly_timeline as xychart-beta line chart and by_location as bar chart instead of name lists. Add: "Too many to list individually — ask me for a filtered view."
+
+---
 
 **Session Alerts**
 - [Session name] — [fill_pct]% full ([checked_in]/[capacity] seats)
 *(omit this section entirely if no sessions are ≥ 80% full)*
 
-**Risks**
-- [Risk 1]
-- [Risk 2]
-*(write "No risks flagged at this time." if risks array is empty)*
+---
+
+**⚠️ Risks**
+
+If risks array is non-empty, render each as a bold alert bullet with names where available:
+- ⚠️ **[Risk description including names]**
+
+If risks array is empty: write "✓ No risks flagged at this time."
+
+The Risks section must always be the last section of the digest and must visually stand out — never bury it.
+
+---
 
 Rules:
-- Show times in 12-hour format with am/pm
-- If \`vip_highlights.not_yet_arrived_sample\` is at the sample limit, add: "…and more. Ask me for the full VIP pending list."
-- Never print raw JSON or internal IDs
+- The hero line (## [pct]% checked in) is mandatory — always the first content after the timestamp
+- Times always in 12-hour format with am/pm
+- Category table always sorted: Board → VIP → Speaker/Staff → others by Rate ASC
+- Bar chart after category table is always rendered — never skipped
+- VIP Highlights always as two bullet lists, never as a sentence
+- Risks always include attendee names when the data has them
+- The placeholder [Your name] in Email Draft should be written as [Sign off with your name]
+- Never print raw JSON, internal field names, or database IDs
+
+---
+
+## Draft Separator
+
+When the same message includes a digest AND a Slack/email/WhatsApp draft, always insert this exact separator between the digest and the first draft:
+
+\`\`\`
+---
+📋 **Drafts**
+---
+\`\`\`
+
+Then present each draft under its own heading: **Slack Draft**, **Email Draft**, **WhatsApp Draft**.
 
 `;
 
