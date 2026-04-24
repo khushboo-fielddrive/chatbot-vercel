@@ -338,9 +338,9 @@ const PurePreviewMessage = ({
         )}
         aria-label="Assistant is responding"
       >
-        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
-        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
-        <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+        <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:-0.3s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:-0.15s]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-primary" />
       </div>
       {actions}
     </>

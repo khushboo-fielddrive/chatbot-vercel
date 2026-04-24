@@ -356,16 +356,16 @@ const mermaid = createMermaidPlugin({
 const streamdownPlugins = { cjk, code, math, mermaid };
 
 const MermaidLoadingFallback = () => (
-  <div className="flex min-h-[160px] items-center justify-center gap-2 rounded-md border border-border/50 bg-muted/40 px-4 py-6 text-muted-foreground text-xs">
-    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
-    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
-    <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+  <div className="flex min-h-[160px] items-center justify-center gap-2 rounded-md border border-[#a9cd70] bg-muted/40 px-4 py-6 text-muted-foreground text-xs">
+    <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:-0.3s]" />
+    <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:-0.15s]" />
+    <span className="size-1.5 animate-pulse rounded-full bg-primary" />
     <span className="ml-2">Rendering chart…</span>
   </div>
 );
 
 const MermaidErrorFallback = () => (
-  <div className="flex min-h-[120px] items-center justify-center rounded-md border border-border/50 bg-muted/30 px-4 py-6 text-muted-foreground text-xs">
+  <div className="flex min-h-[120px] items-center justify-center rounded-md border border-[#a9cd70] bg-muted/30 px-4 py-6 text-muted-foreground text-xs">
     Chart couldn't render.
   </div>
 );

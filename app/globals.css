@@ -527,3 +527,56 @@ textarea:focus-visible {
 [data-language="mermaid"] .legend text {
   fill: currentColor !important;
 }
+
+/* Brand green borders for Streamdown tables and mermaid chart blocks */
+[data-streamdown="table-wrapper"],
+[data-streamdown="table-wrapper"] *,
+[data-streamdown="mermaid-block"],
+[data-streamdown="mermaid-block"] * {
+  border-color: #a9cd70;
+}
+
+/* Clean white body for tables and charts — no fill on wrapper */
+[data-streamdown="table-wrapper"],
+[data-streamdown="mermaid-block"] {
+  background-color: transparent !important;
+  border-top-width: 3px !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 6px 16px -4px rgba(169, 205, 112, 0.18);
+}
+[data-streamdown="table-wrapper"] > div,
+[data-streamdown="mermaid-block"] > div {
+  background-color: var(--background) !important;
+}
+
+/* Polished gradient header — slightly lighter top fading to brand green */
+[data-streamdown="table-header"] {
+  background: linear-gradient(180deg, #b6d683 0%, #a9cd70 100%) !important;
+}
+[data-streamdown="table-header"] [data-streamdown="table-header-cell"] {
+  color: #1a2e08 !important;
+  font-weight: 600;
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+  letter-spacing: 0.01em;
+}
+
+/* Slightly more vertical breathing room in body cells */
+[data-streamdown="table-cell"] {
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+}
+
+.dark [data-streamdown="table-wrapper"],
+.dark [data-streamdown="mermaid-block"] {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 6px 16px -4px rgba(169, 205, 112, 0.12);
+}
+.dark [data-streamdown="table-header"] {
+  background: linear-gradient(180deg, rgba(169, 205, 112, 0.9) 0%, rgba(169, 205, 112, 0.75) 100%) !important;
+}
+.dark [data-streamdown="table-header"] [data-streamdown="table-header-cell"] {
+  color: #0a1400 !important;
+}
