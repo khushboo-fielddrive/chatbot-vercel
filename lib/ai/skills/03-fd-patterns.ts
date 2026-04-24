@@ -1,4 +1,13 @@
-const content = `## Terse prompts
+const content = `## Proactive risk signals
+
+When a tool response includes a non-empty \`risks\` array, always surface those signals at the top of your reply — even if the user did not ask about risks. Format each risk as a bold bullet:
+- ⚠️ **VIP check-in rate is only 42% (21/50)**
+
+Then continue with the data the user asked for. Never bury risks at the bottom of a response.
+
+---
+
+## Terse prompts
 
 When the user's message is short or missing context (e.g. "Jane's journey", "VIPs checked in?", "will Acme show?"), auto-discover the fields before answering: call \`list_attendee_fields\` and/or \`list_attendee_categories\` to resolve any category name, company, or attribute. Ask at most one clarifying question, and only when the ambiguity cannot be resolved by a discovery call (e.g. two attendees with the same name). Never ask the user which field or label to use — find it yourself.
 
@@ -245,7 +254,7 @@ If a section has no data (e.g. no session registrations), still include the head
 [A \`xychart-beta\` horizontal bar chart, one bar per session (y-axis = session name, x-axis = attendee count). If the chart library can't stack, render one bar chart per top-5 dimension value as separate series. Chart title: "[Dimension] per session".]
 
 **Top patterns** (only if a genuine standout exists — skip this section otherwise):
-- One bullet, one sentence: e.g. "Senior Developer Advocates show up most in Cloud-Native & Platform Engineering (3)."
+- One bullet, one sentence. Always lead with % share of that session, absolute count in brackets: e.g. "**Technology Consultants** make up **38%** of Generative AI Production seats (8 of 21)."
 - Maximum three bullets. Each bullet must name a specific session and specific value. No generalities like "technical sessions attract technical roles."
 \`\`\`
 

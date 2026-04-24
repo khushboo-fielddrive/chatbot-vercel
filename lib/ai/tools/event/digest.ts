@@ -31,6 +31,8 @@ export function createDigestTools(accountId: number, eventId: number) {
           [operatorComboCountRows],
           sessionRows,
           historicalRows,
+          notCheckedInStatusRows,
+          [sessionEngagedRows],
         ] = await Promise.all([
           // 1. Overall summary
           eventPool.query(
@@ -143,6 +145,27 @@ export function createDigestTools(accountId: number, eventId: number) {
              FROM Attendee a
              JOIN Event e ON e.id = a.event_id
              WHERE e.account_id = ? AND a.deleted = 0 AND e.deleted = 0 AND e.id != ?`,
+            [accountId, eventId],
+          ) as Promise<[any[], any]>,
+
+          // 10. Not-checked-in breakdown by registration status
+          fetchAll(
+            `SELECT a.registrationStatus AS status, COUNT(*) AS count
+             FROM Attendee a
+             JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE a.event_id = ? AND a.deleted = 0 AND a.checkinAt IS NULL
+             GROUP BY a.registrationStatus ORDER BY count DESC`,
+            [accountId, eventId],
+          ),
+
+          // 11. Session engagement depth — checked-in attendees who scanned into ≥1 session
+          eventPool.query(
+            `SELECT COUNT(DISTINCT sr.attendee) AS session_engaged
+             FROM SessionReservation sr
+             JOIN SessionScan ss ON ss.sessionReservation_id = sr.id AND ss.sessionScanType = 1
+             JOIN Attendee a ON a.id = sr.attendee AND a.deleted = 0 AND a.checkinAt IS NOT NULL
+             JOIN Event e ON e.id = sr.event_id AND e.account_id = ? AND e.deleted = 0
+             WHERE sr.event_id = ? AND sr.deleted = 0`,
             [accountId, eventId],
           ) as Promise<[any[], any]>,
         ]);
@@ -382,6 +405,54 @@ export function createDigestTools(accountId: number, eventId: number) {
           }
         }
 
+        // Enrich mode_split with % of total checked-in
+        const totalCheckedIn = Number(overall.checked_in ?? 0);
+        const enrichedModeSplit = checkinModeRows.map((r: any) => ({
+          ...r,
+          pct: totalCheckedIn > 0
+            ? Math.round(Number(r.count) / totalCheckedIn * 1000) / 10
+            : 0,
+        }));
+
+        // ── Enhancement 1: completion estimate ───────────────────────────
+        const total = Number(overall.total_registered);
+        const now = Date.now();
+        const completion_estimate: Record<string, string | null> = {};
+        for (const [key, targetPct] of [['80pct', 0.8], ['90pct', 0.9], ['100pct', 1.0]] as [string, number][]) {
+          const targetCount = Math.ceil(total * targetPct);
+          const remaining = targetCount - totalCheckedIn;
+          if (remaining <= 0) {
+            completion_estimate[key] = 'already_reached';
+          } else if (lastHour === 0) {
+            completion_estimate[key] = null; // no velocity — cannot estimate
+          } else {
+            const hoursNeeded = remaining / lastHour;
+            completion_estimate[key] = new Date(now + hoursNeeded * 3600000).toISOString();
+          }
+        }
+
+        // ── Enhancement 3: top 3 operators ───────────────────────────────
+        const operatorSource: any[] = kioskStatus.stats_only
+          ? (kioskStatus as any).by_operator ?? []
+          : ((kioskStatus as any).data ?? []).reduce((acc: any[], r: any) => {
+              const ex = acc.find((x) => x.operator === r.operator);
+              if (ex) ex.checkins += Number(r.checkins);
+              else acc.push({ operator: r.operator, checkins: Number(r.checkins) });
+              return acc;
+            }, []);
+        const top3_operators = [...operatorSource]
+          .sort((a, b) => Number(b.checkins) - Number(a.checkins))
+          .slice(0, 3);
+
+        // ── Enhancement 4: session engagement depth ───────────────────────
+        const sessionEngaged = Number(sessionEngagedRows[0]?.session_engaged ?? 0);
+        const session_engagement = {
+          checked_in_attended_session: sessionEngaged,
+          pct: totalCheckedIn > 0
+            ? Math.round(sessionEngaged / totalCheckedIn * 1000) / 10
+            : 0,
+        };
+
         return JSON.stringify(
           {
             generated_at: new Date().toISOString(),
@@ -397,14 +468,17 @@ export function createDigestTools(accountId: number, eventId: number) {
               prev_hour_checkins: prevHour,
               trend: velocityTrend,
             },
+            completion_estimate,
             category_breakdown: categoryRows,
-            kiosk_status: { mode_split: checkinModeRows, ...kioskStatus },
+            kiosk_status: { mode_split: enrichedModeSplit, top3_operators, ...kioskStatus },
             vip_highlights: {
               category_used: vip_category_name,
               checked_in: vipCheckedInData,
               not_yet_arrived: vipMissingData,
             },
+            not_checked_in_by_status: notCheckedInStatusRows,
             session_capacity_alerts: sessionRows,
+            session_engagement,
             risks,
           },
           null,

@@ -16,7 +16,7 @@ export function createStatsTools(accountId: number, eventId: number) {
           ),
       }),
       execute: async ({ include_sessions }) => {
-        const [[summaryRows], [lastHourRows], [categoryRows], [regRows], [approvalRows]] =
+        const [[summaryRows], [lastHourRows], [categoryRows], [regRows], [approvalRows], [histRows]] =
           await Promise.all([
             eventPool.query(
               `SELECT COUNT(*) AS total_attendees,
@@ -62,20 +62,46 @@ export function createStatsTools(accountId: number, eventId: number) {
                GROUP BY a.approvalStatus ORDER BY count DESC`,
               [accountId, eventId],
             ) as Promise<[any[], any]>,
+            eventPool.query(
+              `SELECT ROUND(AVG(rate), 1) AS hist_rate_pct FROM (
+                 SELECT ROUND(SUM(a.checkinAt IS NOT NULL) / NULLIF(COUNT(*), 0) * 100, 1) AS rate
+                 FROM Attendee a
+                 JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
+                 WHERE a.deleted = 0 AND e.id != ?
+                 GROUP BY e.id
+               ) sub`,
+              [accountId, eventId],
+            ) as Promise<[any[], any]>,
           ]);
 
+        const summary = {
+          ...summaryRows[0],
+          last_hour_checkins: lastHourRows[0].last_hour_checkins,
+        };
+        const historical_avg_checkin_pct = histRows[0]?.hist_rate_pct ?? null;
+
+        // Build risks array
+        const risks: string[] = [];
+        if (
+          historical_avg_checkin_pct !== null &&
+          Number(summary.check_in_pct) < Number(historical_avg_checkin_pct) - 10
+        ) {
+          risks.push(
+            `Check-in rate (${summary.check_in_pct}%) is ${(Number(historical_avg_checkin_pct) - Number(summary.check_in_pct)).toFixed(1)}pp below historical average (${historical_avg_checkin_pct}%)`,
+          );
+        }
+
         const result: Record<string, unknown> = {
-          summary: {
-            ...summaryRows[0],
-            last_hour_checkins: lastHourRows[0].last_hour_checkins,
-          },
+          summary,
+          historical_avg_checkin_pct,
           category_breakdown: categoryRows,
           registration_status: regRows,
           approval_status: approvalRows,
+          risks,
         };
 
         if (include_sessions) {
-          result.session_stats = await fetchAll(
+          const sessionStats = await fetchAll(
             `SELECT es.name, es.maxPeople AS capacity,
                     SUM(sr.cancelled = 0 OR sr.cancelled IS NULL) AS active_reservations,
                     COUNT(ss.id) AS checked_in,
@@ -89,6 +115,13 @@ export function createStatsTools(accountId: number, eventId: number) {
              ORDER BY fill_pct DESC`,
             [accountId, eventId],
           );
+          result.session_stats = sessionStats;
+          // Add session capacity risks
+          for (const s of sessionStats as any[]) {
+            if (Number(s.fill_pct) >= 90) {
+              risks.push(`Session "${s.name}" is ${s.fill_pct}% full (${s.active_reservations}/${s.capacity} seats)`);
+            }
+          }
         }
 
         return JSON.stringify(result, null, 2);
@@ -305,7 +338,7 @@ export function createStatsTools(accountId: number, eventId: number) {
 
     get_custom_field_distribution: tool({
       description:
-        "ALWAYS use for counts/charts grouped by any custom field (country, company, job title, etc.). Returns [{value, count}]. Never use list tools and count manually.",
+        "ALWAYS use for counts/charts grouped by any custom field (country, company, job title, etc.). Returns distribution with percentage share and concentration note. Never use list tools and count manually.",
       inputSchema: z.object({
         field_label: z.string().describe("Custom field label to group by (e.g. 'country')"),
         checked_in_only: z
@@ -315,7 +348,7 @@ export function createStatsTools(accountId: number, eventId: number) {
       }),
       execute: async ({ field_label, checked_in_only }) => {
         const checkinFilter = checked_in_only ? "AND a.checkinAt IS NOT NULL" : "";
-        return query(
+        const rows = await fetchAll(
           `SELECT afv.responseValue AS value, COUNT(DISTINCT a.id) AS count
            FROM Attendee a
            JOIN Event e ON e.id = a.event_id AND e.account_id = ? AND e.deleted = 0
@@ -326,15 +359,26 @@ export function createStatsTools(accountId: number, eventId: number) {
            ORDER BY count DESC`,
           [accountId, eventId, `%${field_label}%`],
         );
+        const total = rows.reduce((s: number, r: any) => s + Number(r.count), 0);
+        const distribution = rows.map((r: any) => ({
+          ...r,
+          pct: total > 0 ? Math.round(Number(r.count) / total * 1000) / 10 : 0,
+        }));
+        const top = distribution[0];
+        const concentration_note =
+          top && top.pct > 50
+            ? `${top.value} accounts for ${top.pct}% of responses`
+            : null;
+        return JSON.stringify({ distribution, concentration_note }, null, 2);
       },
     }),
 
     get_category_breakdown: tool({
       description:
-        "ALWAYS use to count/compare attendees by category (VIP, Speaker, General, etc.). Returns each category with total and checked-in count. Never count category_id manually.",
+        "ALWAYS use to count/compare attendees by category (VIP, Speaker, General, etc.). Returns each category with total, checked-in count, check-in rate, and risk signals for critical categories behind. Never count category_id manually.",
       inputSchema: z.object({}),
-      execute: async () =>
-        query(
+      execute: async () => {
+        const rows = await fetchAll(
           `SELECT
              ac.name AS category,
              COUNT(a.id) AS total,
@@ -346,7 +390,24 @@ export function createStatsTools(accountId: number, eventId: number) {
            GROUP BY a.category_id, ac.name
            ORDER BY total DESC`,
           [accountId, eventId],
-        ),
+        );
+        const categories = rows.map((r: any) => ({
+          ...r,
+          checkin_pct: Number(r.total) > 0
+            ? Math.round(Number(r.checked_in) / Number(r.total) * 1000) / 10
+            : 0,
+        }));
+        const criticalKeywords = ['vip', 'staff', 'speaker', 'board'];
+        const risks = categories
+          .filter((r: any) =>
+            criticalKeywords.some(k => r.category?.toLowerCase().includes(k)) &&
+            r.checkin_pct < 60,
+          )
+          .map((r: any) =>
+            `${r.category} check-in rate is only ${r.checkin_pct}% (${r.checked_in}/${r.total})`,
+          );
+        return JSON.stringify({ categories, risks }, null, 2);
+      },
     }),
 
     get_registration_status_breakdown: tool({
@@ -373,8 +434,19 @@ export function createStatsTools(accountId: number, eventId: number) {
           ),
         ]) as [[any[], any], [any[], any]];
 
+        const addPct = (rows: any[]) => {
+          const total = rows.reduce((s, r) => s + Number(r.count), 0);
+          return rows.map(r => ({
+            ...r,
+            pct: total > 0 ? Math.round(Number(r.count) / total * 1000) / 10 : 0,
+          }));
+        };
+
         return JSON.stringify(
-          { registrationStatus: regRows[0], approvalStatus: approvalRows[0] },
+          {
+            registrationStatus: addPct(regRows[0]),
+            approvalStatus: addPct(approvalRows[0]),
+          },
           null,
           2,
         );
@@ -464,15 +536,15 @@ export function createStatsTools(accountId: number, eventId: number) {
 
     get_checkin_timeline: tool({
       description:
-        "Returns check-in counts grouped by time slots. Use for 'when do most people check in?', 'check-in trend over time'.",
+        "Returns check-in counts grouped by time slots with running cumulative totals, peak slot, and tail-off signal. Use for 'when do most people check in?', 'check-in trend over time'.",
       inputSchema: z.object({
         slot_mins: z
           .union([z.literal(15), z.literal(60)])
           .default(60)
           .describe("Bucket size in minutes — always use 60 (default) unless the user explicitly asks for 'detailed', 'granular', or 'zoom in' view, then use 15"),
       }),
-      execute: async ({ slot_mins }) =>
-        query(
+      execute: async ({ slot_mins }) => {
+        const rows = await fetchAll(
           `SELECT
              DATE_FORMAT(
                FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(a.checkinAt) / (? * 60)) * (? * 60)),
@@ -485,7 +557,22 @@ export function createStatsTools(accountId: number, eventId: number) {
            GROUP BY time_slot
            ORDER BY time_slot`,
           [slot_mins, slot_mins, accountId, eventId],
-        ),
+        );
+        let running = 0;
+        const slots = rows.map((r: any) => {
+          running += Number(r.checkins);
+          return { ...r, cumulative: running };
+        });
+        const peak = slots.length
+          ? slots.reduce((max: any, r: any) =>
+              Number(r.checkins) > Number(max.checkins) ? r : max, slots[0])
+          : null;
+        const last = slots[slots.length - 1] ?? null;
+        const tail_off = peak && last && last.time_slot !== peak.time_slot
+          ? Number(last.checkins) < Number(peak.checkins) * 0.5
+          : false;
+        return JSON.stringify({ slots, peak_slot: peak, tail_off }, null, 2);
+      },
     }),
   };
 }

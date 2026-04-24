@@ -5,15 +5,24 @@ import { eventPool, fetchAll, query } from "@/lib/db/event-db";
 export function createSessionTools(accountId: number, eventId: number) {
   return {
     list_event_sessions: tool({
-      description: "List all sessions for the event.",
+      description: "List all sessions for the event with registration counts, check-in counts, and fill rate percentage.",
       inputSchema: z.object({}),
       execute: async () =>
         query(
           `SELECT es.id, es.name, es.startDateTime, es.endDateTime, es.maxPeople, es.mode,
-                  es.allowScanningOut, es.allowForcedCheckIn, es.location_id
+                  es.allowScanningOut, es.allowForcedCheckIn, es.location_id,
+                  COUNT(CASE WHEN sr.cancelled = 0 THEN 1 END) AS registered_count,
+                  COUNT(CASE WHEN sr.cancelled = 0 AND ss.id IS NOT NULL THEN 1 END) AS checked_in_count,
+                  CASE WHEN es.maxPeople > 0
+                    THEN ROUND(COUNT(CASE WHEN sr.cancelled = 0 THEN 1 END) / es.maxPeople * 100, 1)
+                    ELSE NULL END AS fill_pct
            FROM EventSession es
            JOIN Event e ON e.id = es.event_id AND e.account_id = ? AND e.deleted = 0
+           LEFT JOIN SessionReservation sr ON sr.session = es.id AND sr.deleted = 0
+           LEFT JOIN SessionScan ss ON ss.sessionReservation_id = sr.id AND ss.sessionScanType = 1
            WHERE es.event_id = ? AND es.deleted = 0
+           GROUP BY es.id, es.name, es.startDateTime, es.endDateTime, es.maxPeople, es.mode,
+                    es.allowScanningOut, es.allowForcedCheckIn, es.location_id
            ORDER BY es.startDateTime`,
           [accountId, eventId],
         ),
